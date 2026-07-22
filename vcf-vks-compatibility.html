@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VCF / vSphere ↔ Supervisor ↔ VKS Compatibility</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a222c;
+    --panel-2: #212b37;
+    --border: #2c3846;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #4a9eff;
+    --accent-dim: #1f3a5f;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --eol: #6e7681;
+    --row-hover: #232f3d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --panel-2: #f0f3f6;
+      --border: #d5dce3;
+      --text: #1a2029;
+      --muted: #5a6672;
+      --accent: #1a6fd4;
+      --accent-dim: #dce9fb;
+      --ok: #1a7f37;
+      --warn: #9a6700;
+      --eol: #8b98a5;
+      --row-hover: #eef3f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px 20px 80px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  header h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
+  header p.sub { color: var(--muted); margin: 0 0 18px; font-size: 13.5px; }
+
+  .disclaimer {
+    background: var(--accent-dim);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+  .disclaimer a { color: var(--accent); }
+  .disclaimer strong { color: var(--text); }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  input[type="search"] {
+    flex: 1 1 260px;
+    min-width: 200px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+    outline: none;
+  }
+  input[type="search"]:focus { border-color: var(--accent); }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 20px;
+    padding: 6px 13px;
+    font-size: 12.5px;
+    cursor: pointer;
+    user-select: none;
+    transition: all .12s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 900px; }
+  thead th {
+    background: var(--panel-2);
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr { background: var(--panel); }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr:last-child td { border-bottom: none; }
+  .era-row td {
+    background: var(--panel-2);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--accent);
+    padding: 8px 14px;
+  }
+  td.ver { font-weight: 600; white-space: nowrap; }
+  td.notes { color: var(--muted); font-size: 12.5px; }
+  .k8s { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.ga { background: rgba(63,185,80,.15); color: var(--ok); }
+  .badge.eol { background: rgba(110,118,129,.2); color: var(--eol); }
+  .badge.patch { background: rgba(210,153,34,.15); color: var(--warn); }
+  .no-results { padding: 30px; text-align: center; color: var(--muted); }
+  footer { color: var(--muted); font-size: 12px; margin-top: 22px; line-height: 1.7; }
+  footer a { color: var(--accent); }
+  .count { color: var(--muted); font-size: 12.5px; margin-left: auto; white-space: nowrap; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>VCF / vSphere ↔ Supervisor ↔ VKS Compatibility</h1>
+    <p class="sub">Local reference mapping VMware Cloud Foundation &amp; vSphere releases to Supervisor and vSphere Kubernetes Service (VKS) versions, including patch releases.</p>
+  </header>
+
+  <div class="disclaimer">
+    <strong>⚠ Verify before you rely on this.</strong> This page is a convenience reference compiled from public release notes and general product knowledge — it is <strong>not</strong> an authoritative source and may contain gaps or errors, especially at the patch level. Always confirm against Broadcom's live
+    <a href="https://interopmatrix.broadcom.com/Interoperability?col=1378,&amp;row=2,%26,&amp;isHidePatch=false&amp;isHideLegacyReleases=false" target="_blank" rel="noopener">Interoperability Matrix</a>.
+    Edit the <code>DATA</code> array in this file's <code>&lt;script&gt;</code> to correct or extend any row.
+  </div>
+
+  <div class="controls">
+    <input type="search" id="search" placeholder="Search any version — e.g. 8.0 U3, 1.30, VKS 3.5, 9.1…" autocomplete="off">
+    <span class="chip active" data-era="all">All</span>
+    <span class="chip" data-era="VCF 9.x / vSphere 9.x">VCF 9.x</span>
+    <span class="chip" data-era="VCF 5.x / vSphere 8.0">VCF 5.x / vSphere 8</span>
+    <span class="chip" data-era="vSphere 7.0 (legacy)">vSphere 7 (legacy)</span>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="tbl-scroll">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th data-k="vcf">VCF Version</th>
+          <th data-k="vsphere">vSphere / vCenter</th>
+          <th data-k="released">Released</th>
+          <th data-k="supervisor">Supervisor (K8s)</th>
+          <th data-k="vks">VKS Release</th>
+          <th data-k="vkr">VKS K8s (VKr)</th>
+          <th data-k="notes">Notes</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="no-results" id="noResults" style="display:none">No rows match your filter.</div>
+
+  <footer>
+    <strong>How the pieces relate:</strong> <em>Supervisor</em> is the Kubernetes control plane embedded in vCenter/ESXi — its bundled K8s version is tied to the <em>vCenter/vSphere patch</em>. <em>VKS</em> (vSphere Kubernetes Service, formerly Tanzu Kubernetes Grid Service / TKGs) is the service that provisions guest ("workload") Kubernetes clusters running <em>VKr</em> (vSphere Kubernetes releases) on top of a Supervisor. Supervisor K8s version and VKS/VKr cluster versions upgrade independently.<br>
+    <strong>Key rules of thumb:</strong> Supervisor minor versions must be upgraded sequentially (e.g. 1.28 → 1.29 → 1.30, no skipping). A given VKS release requires a minimum Supervisor version. Guest cluster (VKr) versions are constrained by the VKS release installed on the Supervisor.<br>
+    Sources: Broadcom TechDocs release notes for vSphere Supervisor, VKS/TKGs, and VCF; Broadcom Interoperability Matrix. Compiled 2026-07 — treat dates/patch mappings as approximate.
+  </footer>
+</div>
+
+<script>
+/* =============================================================================
+   EDIT THIS ARRAY to correct or add rows. Fields:
+     era       - grouping label (must match a filter chip's data-era to filter)
+     vcf       - VMware Cloud Foundation version (or "—" if N/A, e.g. standalone vSphere)
+     vsphere   - vSphere / vCenter / ESXi version or patch
+     released  - approximate GA date
+     supervisor- Supervisor build + bundled Kubernetes version(s)
+     vks       - VKS / TKGs release that shipped/was supported with this line
+     vkr       - guest-cluster Kubernetes versions (VKr) available
+     status    - "ga" | "eol" | "patch"  (drives the badge)
+     notes     - free text; dependencies, upgrade-path caveats, etc.
+   NOTE: verify every value against the Broadcom Interoperability Matrix.
+   ============================================================================= */
+const DATA = [
+  // ---------------- VCF 9.x / vSphere 9.x (unified versioning) ----------------
+  { era:"VCF 9.x / vSphere 9.x", vcf:"9.1", vsphere:"vSphere 9.1", released:"2025 H2", status:"ga",
+    supervisor:"Supervisor 9.1", vks:"VKS 3.7", vkr:"1.36, 1.35, 1.34",
+    notes:"VKS 3.7 adds VKr 1.36 (Cluster API v1.13, CAPV v1.16). Supervisor upgraded independently of guest clusters." },
+  { era:"VCF 9.x / vSphere 9.x", vcf:"9.1", vsphere:"vSphere 9.1", released:"2026 (approx)", status:"ga",
+    supervisor:"Supervisor 9.1", vks:"VKS 3.6", vkr:"1.35, 1.34, 1.33",
+    notes:"VKS 3.6 adds VKr 1.35. Direct upgrade to VKS 3.6 requires VKS ≥ 3.3 already installed on Supervisor." },
+  { era:"VCF 9.x / vSphere 9.x", vcf:"9.0.2", vsphere:"vSphere 9.0 U2", released:"2025 (approx)", status:"ga",
+    supervisor:"Supervisor 9.0.2 (K8s 1.32, 1.31, 1.30)", vks:"VKS 3.5", vkr:"1.34, 1.33, 1.32",
+    notes:"VKS 3.5 (GA Oct 2025) enables VKr 1.34 with 24-month support per K8s minor version. Supervisor 9.0.2 bundles K8s 1.32/1.31/1.30." },
+  { era:"VCF 9.x / vSphere 9.x", vcf:"9.0", vsphere:"vSphere 9.0", released:"2025", status:"ga",
+    supervisor:"Supervisor 9.0 (K8s 1.32, 1.31)", vks:"VKS 3.4 / 3.3", vkr:"1.33, 1.32, 1.31",
+    notes:"First release of the unified VCF 9 / vSphere 9 line; Supervisor and vCenter share the 9.0 version number." },
+
+  // ---------------- VCF 5.x / vSphere 8.0 ----------------
+  { era:"VCF 5.x / vSphere 8.0", vcf:"5.2.1 / 5.2.2", vsphere:"vCenter/ESXi 8.0 U3+", released:"2024 Q4–2025", status:"ga",
+    supervisor:"Supervisor 8.0 U3 (K8s 1.31, 1.30, 1.29)", vks:"VKS 3.2 / 3.3", vkr:"1.31, 1.30, 1.29, 1.28",
+    notes:"vCenter 8.0 U3h → Supervisor ≥ 1.31; 8.0 U3g → Supervisor ≥ 1.30. Supervisor 8.0 later drops 1.28/1.29." },
+  { era:"VCF 5.x / vSphere 8.0", vcf:"5.2", vsphere:"vCenter/ESXi 8.0 U3", released:"2024-07-24", status:"ga",
+    supervisor:"Supervisor 8.0 U3 (K8s 1.30, 1.29, 1.28)", vks:"VKS 3.1 / 3.0", vkr:"1.30, 1.29, 1.28, 1.27",
+    notes:"vCenter 8.0 U3g and above → Supervisor K8s ≥ 1.30. TKGs rebranded to VKS in this era." },
+  { era:"VCF 5.x / vSphere 8.0", vcf:"5.1.1", vsphere:"vCenter/ESXi 8.0 U2b", released:"2024 Q1", status:"eol",
+    supervisor:"Supervisor 8.0 U2 (K8s 1.28, 1.27, 1.26)", vks:"TKGs 2.x", vkr:"1.28, 1.27, 1.26, 1.25",
+    notes:"vCenter 8.0 U2 b/c/d → Supervisor K8s ≥ 1.28." },
+  { era:"VCF 5.x / vSphere 8.0", vcf:"5.1", vsphere:"vCenter/ESXi 8.0 U2", released:"2023-11-07", status:"eol",
+    supervisor:"Supervisor 8.0 U2 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25, 1.24",
+    notes:"NSX 4.1.x, vSAN 8.0 U2. Supervisor minor versions must be stepped sequentially." },
+  { era:"VCF 5.x / vSphere 8.0", vcf:"5.0", vsphere:"vCenter/ESXi 8.0 U1a", released:"2023-06-01", status:"eol",
+    supervisor:"Supervisor 8.0 U1 (K8s 1.25, 1.24, 1.23)", vks:"TKGs 2.x", vkr:"1.26, 1.25, 1.24, 1.23",
+    notes:"First VCF 5 release. vSphere 8.0 U1a, vSAN 8.0 U1a, NSX 4.1." },
+
+  // ---------------- vSphere 7.0 (legacy) ----------------
+  { era:"vSphere 7.0 (legacy)", vcf:"4.5.x", vsphere:"vCenter/ESXi 7.0 U3v+", released:"2022–2024", status:"eol",
+    supervisor:"Supervisor 7.0 U3 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25",
+    notes:"vCenter 7.0 U3v → Supervisor K8s 1.27 (last minor on 7.0). vSphere 7 is end-of-general-support." },
+  { era:"vSphere 7.0 (legacy)", vcf:"4.x", vsphere:"vCenter/ESXi 7.0 U1–U3", released:"2020–2022", status:"eol",
+    supervisor:"Supervisor (K8s 1.16–1.24, ships w/ vCenter patch)", vks:"TKGs 1.x / 2.0", vkr:"1.16 – 1.24",
+    notes:"Original 'vSphere with Tanzu' era. Supervisor K8s version was tightly coupled to each vCenter 7.0 patch." },
+];
+
+const badgeFor = s =>
+  s === "ga"    ? '<span class="badge ga">GA</span>' :
+  s === "patch" ? '<span class="badge patch">PATCH</span>' :
+  s === "eol"   ? '<span class="badge eol">EOL</span>' : '';
+
+const tbody = document.getElementById('tbody');
+const search = document.getElementById('search');
+const countEl = document.getElementById('count');
+const noResults = document.getElementById('noResults');
+const chips = [...document.querySelectorAll('.chip')];
+
+let activeEra = 'all';
+let sortKey = null, sortDir = 1;
+
+function rowMatches(r, q) {
+  if (!q) return true;
+  const hay = [r.vcf, r.vsphere, r.released, r.supervisor, r.vks, r.vkr, r.notes].join(' ').toLowerCase();
+  return q.toLowerCase().split(/\s+/).every(t => hay.includes(t));
+}
+
+function render() {
+  const q = search.value.trim();
+  let rows = DATA.filter(r =>
+    (activeEra === 'all' || r.era === activeEra) && rowMatches(r, q)
+  );
+  if (sortKey) {
+    rows = [...rows].sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : -1) * sortDir);
+  }
+
+  tbody.innerHTML = '';
+  let lastEra = null;
+  for (const r of rows) {
+    if (!sortKey && r.era !== lastEra) {
+      lastEra = r.era;
+      const er = tbody.insertRow();
+      er.className = 'era-row';
+      const c = er.insertCell();
+      c.colSpan = 7;
+      c.textContent = r.era;
+    }
+    const tr = tbody.insertRow();
+    tr.innerHTML = `
+      <td class="ver">${r.vcf} ${badgeFor(r.status)}</td>
+      <td class="ver">${r.vsphere}</td>
+      <td>${r.released}</td>
+      <td class="k8s">${r.supervisor}</td>
+      <td class="ver">${r.vks}</td>
+      <td class="k8s">${r.vkr}</td>
+      <td class="notes">${r.notes}</td>`;
+  }
+  noResults.style.display = rows.length ? 'none' : 'block';
+  countEl.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
+}
+
+chips.forEach(ch => ch.addEventListener('click', () => {
+  chips.forEach(c => c.classList.remove('active'));
+  ch.classList.add('active');
+  activeEra = ch.dataset.era;
+  render();
+}));
+
+document.querySelectorAll('thead th').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; }
+  render();
+}));
+
+search.addEventListener('input', render);
+render();
+</script>
+</body>
+</html>
