@@ -96,7 +96,7 @@
   .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .tbl-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1180px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1320px; }
   thead th {
     background: var(--panel-2); text-align: left; padding: 10px 12px; font-weight: 600;
     font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted);
@@ -152,6 +152,7 @@
       <div class="kv"><div class="k">NSX</div><div class="v"><code>4.2.2.1.0 · build 24765084</code></div></div>
       <div class="kv"><div class="k">VKS / TKGs</div><div class="v"><code>v3.0.0</code> — Supervisor-embedded</div></div>
       <div class="kv"><div class="k">Guest cluster K8s (VKr/TKr)</div><div class="v"><code>v1.26.13+vmware.1-fips.1-tkg.3</code></div></div>
+      <div class="kv"><div class="k">Guest CNI</div><div class="v">Antrea <code>~v1.11.x</code> <span style="font-weight:400;color:var(--warn)">verify</span></div></div>
       <div class="kv"><div class="k">Tanzu Standard package repo</div><div class="v"><code>v2023.9.19</code> (TKG 2.4 line)</div></div>
       <div class="kv"><div class="k">cert-manager</div><div class="v"><code>~v1.12.2+vmware.2-tkg.1</code> <span style="font-weight:400;color:var(--warn)">verify</span></div></div>
       <div class="kv"><div class="k">Contour</div><div class="v"><code>~v1.24.4+vmware.1-tkg.1</code> <span style="font-weight:400;color:var(--warn)">verify</span></div></div>
@@ -167,7 +168,7 @@
   <!-- ============================ MATRIX ============================ -->
   <h2>Compatibility matrix</h2>
   <div class="controls">
-    <input type="search" id="search" placeholder="Search any version — e.g. 8.0 U3, 1.26, VKS 3.0, NSX 4.2, contour…" autocomplete="off">
+    <input type="search" id="search" placeholder="Search any version — e.g. 8.0 U3, 1.26, VKS 3.0, NSX 4.2, antrea, contour…" autocomplete="off">
     <span class="chip active" data-era="all">All</span>
     <span class="chip" data-era="VCF 9.x / vSphere 9.x">VCF 9.x</span>
     <span class="chip" data-era="vSphere 8.0 + NSX (no VCF)">vSphere 8 + NSX</span>
@@ -186,6 +187,7 @@
           <th data-k="supervisor">Supervisor (K8s)</th>
           <th data-k="vks">VKS / TKGs</th>
           <th data-k="vkr">Guest K8s (VKr/TKr)</th>
+          <th data-k="antrea">Antrea CNI</th>
           <th data-k="tanzustd">Tanzu Std repo</th>
           <th data-k="certmgr">cert-manager</th>
           <th data-k="contour">Contour</th>
@@ -209,7 +211,7 @@
   </div>
 
   <footer>
-    <strong>How the pieces relate:</strong> <em>Supervisor</em> is the Kubernetes control plane embedded in vCenter/ESXi; its bundled K8s version is tied to the vCenter/vSphere patch. <em>VKS</em> (vSphere Kubernetes Service — formerly Tanzu Kubernetes Grid Service / TKGs) provisions guest ("workload") clusters running <em>VKr/TKr</em> Kubernetes releases on top of a Supervisor. <em>cert-manager</em> and <em>Contour</em> are <em>Tanzu Standard</em> packages (certificate automation and ingress, respectively) installed into workload clusters or as Supervisor Services; their versions come from the <strong>Tanzu Standard repository</strong> version, not from VKS directly. <em>Avi Controller / AKO</em> is the alternative L4–L7 load-balancing/ingress path (NSX Advanced Load Balancer) — not in use in your environment.<br>
+    <strong>How the pieces relate:</strong> <em>Supervisor</em> is the Kubernetes control plane embedded in vCenter/ESXi; its bundled K8s version is tied to the vCenter/vSphere patch. <em>VKS</em> (vSphere Kubernetes Service — formerly Tanzu Kubernetes Grid Service / TKGs) provisions guest ("workload") clusters running <em>VKr/TKr</em> Kubernetes releases on top of a Supervisor. <em>cert-manager</em> and <em>Contour</em> are <em>Tanzu Standard</em> packages (certificate automation and ingress, respectively) installed into workload clusters or as Supervisor Services; their versions come from the <strong>Tanzu Standard repository</strong> version, not from VKS directly. <em>Avi Controller / AKO</em> is the alternative L4–L7 load-balancing/ingress path (NSX Advanced Load Balancer) — not in use in your environment. <em>Antrea</em> is the default pod-network CNI inside guest clusters (bundled with the TKr/VKr image; Calico is the alternative) — distinct from <em>NSX</em>, which provides the Supervisor/underlay networking. <em>NSX ↔ vSphere</em>: each NSX release is qualified against specific vSphere/vCenter builds — e.g. NSX 4.2.x aligns with vSphere 8.0 U3 and vSphere 9.x; always confirm the exact NSX build against the vSphere version in the interop matrix.<br>
     <strong>Upgrade rules of thumb:</strong> Supervisor minor versions step sequentially (e.g. 1.28 → 1.29 → 1.30, no skips). A given VKS release requires a minimum Supervisor version. Guest (VKr/TKr) versions are bounded by the VKS release on the Supervisor. Package versions (cert-manager, Contour) advance with the Tanzu Standard repo you point clusters at.<br>
     Sources: Broadcom TechDocs release notes (vSphere Supervisor, VKS/TKGs, Tanzu Standard repository, NSX) and the Broadcom Interoperability Matrix. Compiled 2026-07 — treat dates and patch/package mappings as approximate until verified.
   </footer>
@@ -227,6 +229,7 @@
      supervisor - Supervisor build + bundled Kubernetes version(s)
      vks        - VKS / TKGs release
      vkr        - guest-cluster Kubernetes versions (VKr / TKr) available
+     antrea     - Antrea CNI version (bundled with the guest TKr / VKr)
      tanzustd   - Tanzu Standard package repository version
      certmgr    - cert-manager package version (from the Tanzu Standard repo)
      contour    - Contour package version (from the Tanzu Standard repo)
@@ -238,49 +241,49 @@
 const DATA = [
   // ---------------- VCF 9.x / vSphere 9.x (unified versioning) ----------------
   { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.x", vsphere:"vSphere 9.1", nsx:"4.2.x+", released:"2025 H2", status:"ga",
-    supervisor:"Supervisor 9.1", vks:"VKS 3.7", vkr:"1.36, 1.35, 1.34",
+    supervisor:"Supervisor 9.1", vks:"VKS 3.7", vkr:"1.36, 1.35, 1.34", antrea:"~1.21.x",
     tanzustd:"2025.x", certmgr:"~1.17.x", contour:"~1.32.x",
-    notes:"VKS 3.7 adds VKr 1.36 (Cluster API v1.13, CAPV v1.16)." },
+    notes:"VKS 3.7 adds VKr 1.36 (Cluster API v1.13, CAPV v1.16). NSX 4.2.x+ aligns with vSphere/VCF 9.1." },
   { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.x", vsphere:"vSphere 9.1", nsx:"4.2.x+", released:"2026 (approx)", status:"ga",
-    supervisor:"Supervisor 9.1", vks:"VKS 3.6", vkr:"1.35, 1.34, 1.33",
+    supervisor:"Supervisor 9.1", vks:"VKS 3.6", vkr:"1.35, 1.34, 1.33", antrea:"~1.19.x",
     tanzustd:"2025.x", certmgr:"~1.16.x", contour:"~1.30.x",
-    notes:"VKS 3.6 adds VKr 1.35. Direct upgrade to 3.6 needs VKS ≥ 3.3 already on Supervisor." },
+    notes:"VKS 3.6 adds VKr 1.35. Direct upgrade to 3.6 needs VKS ≥ 3.3 already on Supervisor. NSX 4.2.x supported with vSphere 9.x." },
   { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.0.2", vsphere:"vSphere 9.0 U2", nsx:"4.2.x", released:"2025 (approx)", status:"ga",
-    supervisor:"Supervisor 9.0.2 (K8s 1.32, 1.31, 1.30)", vks:"VKS 3.5", vkr:"1.34, 1.33, 1.32",
+    supervisor:"Supervisor 9.0.2 (K8s 1.32, 1.31, 1.30)", vks:"VKS 3.5", vkr:"1.34, 1.33, 1.32", antrea:"~1.17.x",
     tanzustd:"2024.x/2025.x", certmgr:"~1.15.x", contour:"~1.29.x",
-    notes:"VKS 3.5 (GA Oct 2025) enables VKr 1.34 with 24-month support per K8s minor." },
+    notes:"VKS 3.5 (GA Oct 2025) enables VKr 1.34 with 24-month support per K8s minor. NSX 4.2.x." },
   { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.0", vsphere:"vSphere 9.0", nsx:"4.2.x", released:"2025", status:"ga",
-    supervisor:"Supervisor 9.0 (K8s 1.32, 1.31)", vks:"VKS 3.4 / 3.3", vkr:"1.33, 1.32, 1.31",
+    supervisor:"Supervisor 9.0 (K8s 1.32, 1.31)", vks:"VKS 3.4 / 3.3", vkr:"1.33, 1.32, 1.31", antrea:"~1.15.x",
     tanzustd:"2024.x", certmgr:"~1.14.x", contour:"~1.28.x",
-    notes:"First unified VCF 9 / vSphere 9 line; Supervisor shares the 9.0 version." },
+    notes:"First unified VCF 9 / vSphere 9 line; Supervisor shares the 9.0 version. NSX 4.2.x." },
 
   // ---------------- vSphere 8.0 + NSX (no VCF) ----------------
   { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U3+ (8.0.3+)", nsx:"4.2.1 / 4.2.2", released:"2024 Q4–2025", status:"ga",
-    supervisor:"Supervisor 8.0 U3 (K8s 1.31, 1.30, 1.29)", vks:"VKS 3.2 / 3.3", vkr:"1.31, 1.30, 1.29, 1.28",
+    supervisor:"Supervisor 8.0 U3 (K8s 1.31, 1.30, 1.29)", vks:"VKS 3.2 / 3.3", vkr:"1.31, 1.30, 1.29, 1.28", antrea:"~1.13.x–1.15.x",
     tanzustd:"2024.x", certmgr:"~1.14.x", contour:"~1.28.x",
-    notes:"vCenter 8.0 U3h → Supervisor ≥ 1.31; 8.0 U3g → Supervisor ≥ 1.30." },
+    notes:"vCenter 8.0 U3h → Supervisor ≥ 1.31; 8.0 U3g → Supervisor ≥ 1.30. NSX 4.2.x supported with vSphere 8.0 U3." },
   { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U3 base (8.0.3, build 24022515)", nsx:"4.2.2.1.0 (build 24765084)", released:"2024-06 / 2024-07", status:"ga", you:true,
-    supervisor:"Supervisor 8.0 U3 (embedded TKGs 3.0.0)", vks:"VKS/TKGs 3.0.0", vkr:"1.26.x–1.28.x (you: 1.26.13-fips.1-tkg.3)",
+    supervisor:"Supervisor 8.0 U3 (embedded TKGs 3.0.0)", vks:"VKS/TKGs 3.0.0", vkr:"1.26.x–1.28.x (you: 1.26.13-fips.1-tkg.3)", antrea:"~1.11.x (bundled in tkg.3, verify)",
     tanzustd:"2023.9.19", certmgr:"~1.12.2+vmware.2-tkg.1", contour:"~1.24.4+vmware.1-tkg.1",
-    notes:"★ YOUR ENVIRONMENT. TKGs 3.0.0 embedded in vSphere 8.0 U3 base. Ingress via Contour (Avi/AKO not deployed). FIPS guest images. Confirm cert-manager/Contour builds in Tanzu Standard v2023.9.19 release notes." },
+    notes:"★ YOUR ENVIRONMENT. TKGs 3.0.0 embedded in vSphere 8.0 U3 base. Antrea is the guest-cluster CNI (matches your 'antrea' cluster names); NSX 4.2.2.1.0 provides the Supervisor underlay. Ingress via Contour (Avi/AKO not deployed). FIPS guest images. Confirm cert-manager/Contour/Antrea builds in Tanzu Standard v2023.9.19 + TKr 1.26.13-tkg.3 release notes." },
   { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U2 (8.0.2)", nsx:"4.1.2 / 4.2.0", released:"2023-09 / 2024 Q1", status:"eol",
-    supervisor:"Supervisor 8.0 U2 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25, 1.24",
+    supervisor:"Supervisor 8.0 U2 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25, 1.24", antrea:"~1.9.x–1.11.x",
     tanzustd:"2023.9.19 / 2023.11.21", certmgr:"~1.12.x", contour:"~1.24.x",
-    notes:"vCenter 8.0 U2 b/c/d → Supervisor K8s ≥ 1.28. Supervisor minors step sequentially." },
+    notes:"vCenter 8.0 U2 b/c/d → Supervisor K8s ≥ 1.28. Supervisor minors step sequentially. NSX 4.1.2 / 4.2.0 with vSphere 8.0 U2." },
   { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U1 (8.0.1)", nsx:"4.1.0 / 4.1.1", released:"2023-04", status:"eol",
-    supervisor:"Supervisor 8.0 U1 (K8s 1.25, 1.24, 1.23)", vks:"TKGs 2.x", vkr:"1.26, 1.25, 1.24, 1.23",
+    supervisor:"Supervisor 8.0 U1 (K8s 1.25, 1.24, 1.23)", vks:"TKGs 2.x", vkr:"1.26, 1.25, 1.24, 1.23", antrea:"~1.7.x–1.9.x",
     tanzustd:"2023.7.x", certmgr:"~1.11.x", contour:"~1.24.x",
-    notes:"Earlier TKGs 2.x line on vSphere 8." },
+    notes:"Earlier TKGs 2.x line on vSphere 8. NSX 4.1.0 / 4.1.1." },
 
   // ---------------- vSphere 7.0 (legacy) ----------------
   { era:"vSphere 7.0 (legacy)", platform:"vSphere 7 + NSX", vsphere:"7.0 U3v+", nsx:"3.2.x / 4.0.x", released:"2022–2024", status:"eol",
-    supervisor:"Supervisor 7.0 U3 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25",
+    supervisor:"Supervisor 7.0 U3 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25", antrea:"~1.7.x–1.9.x",
     tanzustd:"2023.x", certmgr:"~1.11.x", contour:"~1.24.x",
-    notes:"vCenter 7.0 U3v → Supervisor K8s 1.27 (last minor on 7.0). vSphere 7 is end-of-general-support." },
+    notes:"vCenter 7.0 U3v → Supervisor K8s 1.27 (last minor on 7.0). NSX 3.2.x / 4.0.x with vSphere 7.0 U3. vSphere 7 is end-of-general-support." },
   { era:"vSphere 7.0 (legacy)", platform:"vSphere 7 + NSX", vsphere:"7.0 U1–U3", nsx:"3.0.x–3.2.x", released:"2020–2022", status:"eol",
-    supervisor:"Supervisor (K8s 1.16–1.24, per vCenter patch)", vks:"TKGs 1.x / 2.0", vkr:"1.16 – 1.24",
+    supervisor:"Supervisor (K8s 1.16–1.24, per vCenter patch)", vks:"TKGs 1.x / 2.0", vkr:"1.16 – 1.24", antrea:"~1.2.x–1.7.x (or Calico)",
     tanzustd:"n/a (TKG extensions)", certmgr:"1.1.x–1.10.x", contour:"1.17.x–1.22.x",
-    notes:"Original 'vSphere with Tanzu' era. Supervisor K8s tightly coupled to each vCenter 7.0 patch." },
+    notes:"Original 'vSphere with Tanzu' era. Supervisor K8s tightly coupled to each vCenter 7.0 patch. NSX 3.0.x–3.2.x. Antrea or Calico selectable as guest CNI." },
 ];
 
 /* Customer's deployed workload clusters (from the supplied inventory table). */
@@ -308,7 +311,7 @@ let sortKey = null, sortDir = 1;
 
 function rowMatches(r, q) {
   if (!q) return true;
-  const hay = [r.platform, r.vsphere, r.nsx, r.released, r.supervisor, r.vks, r.vkr, r.tanzustd, r.certmgr, r.contour, r.notes].join(' ').toLowerCase();
+  const hay = [r.platform, r.vsphere, r.nsx, r.released, r.supervisor, r.vks, r.vkr, r.antrea, r.tanzustd, r.certmgr, r.contour, r.notes].join(' ').toLowerCase();
   return q.toLowerCase().split(/\s+/).every(t => hay.includes(t));
 }
 
@@ -324,7 +327,7 @@ function render() {
       lastEra = r.era;
       const er = tbody.insertRow();
       er.className = 'era-row';
-      const c = er.insertCell(); c.colSpan = 11; c.textContent = r.era;
+      const c = er.insertCell(); c.colSpan = 12; c.textContent = r.era;
     }
     const tr = tbody.insertRow();
     if (r.you) tr.className = 'you-row';
@@ -336,6 +339,7 @@ function render() {
       <td class="k8s">${r.supervisor}</td>
       <td class="ver">${r.vks}</td>
       <td class="k8s">${r.vkr}</td>
+      <td class="k8s">${r.antrea}</td>
       <td class="ver">${r.tanzustd}</td>
       <td class="k8s">${r.certmgr}</td>
       <td class="k8s">${r.contour}</td>
