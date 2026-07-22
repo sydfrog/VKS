@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VCF / vSphere ↔ Supervisor ↔ VKS Compatibility</title>
+<title>vSphere / VCF ↔ Supervisor ↔ VKS Compatibility &amp; Dependencies</title>
 <style>
   :root {
     --bg: #0f1419;
@@ -17,6 +17,8 @@
     --ok: #3fb950;
     --warn: #d29922;
     --eol: #6e7681;
+    --you: #a371f7;
+    --you-bg: rgba(163,113,247,.12);
     --row-hover: #232f3d;
   }
   @media (prefers-color-scheme: light) {
@@ -32,6 +34,8 @@
       --ok: #1a7f37;
       --warn: #9a6700;
       --eol: #8b98a5;
+      --you: #8250df;
+      --you-bg: rgba(130,80,223,.08);
       --row-hover: #eef3f8;
     }
   }
@@ -43,9 +47,10 @@
     font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     padding: 24px 20px 80px;
   }
-  .wrap { max-width: 1240px; margin: 0 auto; }
+  .wrap { max-width: 1360px; margin: 0 auto; }
   header h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
   header p.sub { color: var(--muted); margin: 0 0 18px; font-size: 13.5px; }
+  h2 { font-size: 16px; margin: 28px 0 10px; letter-spacing: -0.2px; }
 
   .disclaimer {
     background: var(--accent-dim);
@@ -55,114 +60,117 @@
     padding: 12px 16px;
     font-size: 13px;
     margin-bottom: 20px;
-    color: var(--text);
   }
   .disclaimer a { color: var(--accent); }
-  .disclaimer strong { color: var(--text); }
 
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 16px;
+  /* Current deployment card */
+  .you-card {
+    background: var(--you-bg);
+    border: 1px solid var(--you);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 22px;
   }
+  .you-card h2 { margin: 0 0 12px; color: var(--you); font-size: 15px; text-transform: uppercase; letter-spacing: .5px; }
+  .kv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 10px 22px;
+  }
+  .kv .k { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .kv .v { font-size: 14px; font-weight: 600; }
+  .kv .v code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 14px; }
   input[type="search"] {
-    flex: 1 1 260px;
-    min-width: 200px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 9px 12px;
-    font-size: 14px;
-    outline: none;
+    flex: 1 1 260px; min-width: 200px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none;
   }
   input[type="search"]:focus { border-color: var(--accent); }
   .chip {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 20px;
-    padding: 6px 13px;
-    font-size: 12.5px;
-    cursor: pointer;
-    user-select: none;
-    transition: all .12s;
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 20px; padding: 6px 13px; font-size: 12.5px; cursor: pointer; user-select: none; transition: all .12s;
   }
   .chip:hover { border-color: var(--accent); color: var(--text); }
   .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .tbl-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 900px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1180px; }
   thead th {
-    background: var(--panel-2);
-    text-align: left;
-    padding: 10px 14px;
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    cursor: pointer;
-    white-space: nowrap;
+    background: var(--panel-2); text-align: left; padding: 10px 12px; font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; cursor: pointer; white-space: nowrap;
   }
   thead th:hover { color: var(--text); }
-  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
   tbody tr { background: var(--panel); }
   tbody tr:hover { background: var(--row-hover); }
   tbody tr:last-child td { border-bottom: none; }
+  tbody tr.you-row { background: var(--you-bg); box-shadow: inset 3px 0 0 var(--you); }
   .era-row td {
-    background: var(--panel-2);
-    font-weight: 700;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .6px;
-    color: var(--accent);
-    padding: 8px 14px;
+    background: var(--panel-2); font-weight: 700; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--accent); padding: 8px 12px;
   }
   td.ver { font-weight: 600; white-space: nowrap; }
-  td.notes { color: var(--muted); font-size: 12.5px; }
-  .k8s { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-  .badge {
-    display: inline-block;
-    font-size: 11px;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
+  td.notes { color: var(--muted); font-size: 12px; min-width: 220px; }
+  .k8s { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
   .badge.ga { background: rgba(63,185,80,.15); color: var(--ok); }
   .badge.eol { background: rgba(110,118,129,.2); color: var(--eol); }
   .badge.patch { background: rgba(210,153,34,.15); color: var(--warn); }
+  .badge.you { background: var(--you); color: #fff; }
   .no-results { padding: 30px; text-align: center; color: var(--muted); }
   footer { color: var(--muted); font-size: 12px; margin-top: 22px; line-height: 1.7; }
   footer a { color: var(--accent); }
   .count { color: var(--muted); font-size: 12.5px; margin-left: auto; white-space: nowrap; }
-  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .mini { font-size: 12.5px; }
+  .mini th, .mini td { padding: 7px 11px; }
+  .mini { min-width: 760px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>VCF / vSphere ↔ Supervisor ↔ VKS Compatibility</h1>
-    <p class="sub">Local reference mapping VMware Cloud Foundation &amp; vSphere releases to Supervisor and vSphere Kubernetes Service (VKS) versions, including patch releases.</p>
+    <h1>vSphere / VCF ↔ Supervisor ↔ VKS Compatibility &amp; Dependencies</h1>
+    <p class="sub">Local reference mapping vSphere / NSX / VCF releases to Supervisor, vSphere Kubernetes Service (VKS/TKGs), guest Kubernetes releases, and the Tanzu Standard services (cert-manager, Contour). Includes patch releases.</p>
   </header>
 
   <div class="disclaimer">
-    <strong>⚠ Verify before you rely on this.</strong> This page is a convenience reference compiled from public release notes and general product knowledge — it is <strong>not</strong> an authoritative source and may contain gaps or errors, especially at the patch level. Always confirm against Broadcom's live
-    <a href="https://interopmatrix.broadcom.com/Interoperability?col=1378,&amp;row=2,%26,&amp;isHidePatch=false&amp;isHideLegacyReleases=false" target="_blank" rel="noopener">Interoperability Matrix</a>.
-    Edit the <code>DATA</code> array in this file's <code>&lt;script&gt;</code> to correct or extend any row.
+    <strong>⚠ Verify before you rely on this.</strong> Compiled from public release notes and product knowledge — <strong>not</strong> authoritative, and patch/package versions (cert-manager, Contour, NSX) may drift. Confirm against Broadcom's live
+    <a href="https://interopmatrix.broadcom.com/Interoperability?col=1378,&amp;row=2,%26,&amp;isHidePatch=false&amp;isHideLegacyReleases=false" target="_blank" rel="noopener">Interoperability Matrix</a>
+    and the relevant Tanzu Standard repository release notes. Edit the <code>DATA</code> array in this file to correct any value.
   </div>
 
+  <!-- ============================ CURRENT DEPLOYMENT ============================ -->
+  <div class="you-card">
+    <h2>★ Your current deployment</h2>
+    <div class="kv-grid">
+      <div class="kv"><div class="k">Platform</div><div class="v">vSphere 8 + NSX <span style="font-weight:400;color:var(--muted)">(no VCF)</span></div></div>
+      <div class="kv"><div class="k">vCenter / ESXi</div><div class="v"><code>8.0.3 (8.0 U3) · build 24022515</code></div></div>
+      <div class="kv"><div class="k">NSX</div><div class="v"><code>4.2.2.1.0 · build 24765084</code></div></div>
+      <div class="kv"><div class="k">VKS / TKGs</div><div class="v"><code>v3.0.0</code> — Supervisor-embedded</div></div>
+      <div class="kv"><div class="k">Guest cluster K8s (VKr/TKr)</div><div class="v"><code>v1.26.13+vmware.1-fips.1-tkg.3</code></div></div>
+      <div class="kv"><div class="k">Tanzu Standard package repo</div><div class="v"><code>v2023.9.19</code> (TKG 2.4 line)</div></div>
+      <div class="kv"><div class="k">cert-manager</div><div class="v"><code>~v1.12.2+vmware.2-tkg.1</code> <span style="font-weight:400;color:var(--warn)">verify</span></div></div>
+      <div class="kv"><div class="k">Contour</div><div class="v"><code>~v1.24.4+vmware.1-tkg.1</code> <span style="font-weight:400;color:var(--warn)">verify</span></div></div>
+      <div class="kv"><div class="k">Avi Controller / AKO</div><div class="v">Not deployed (NIL)</div></div>
+      <div class="kv"><div class="k">Node OS</div><div class="v">Photon</div></div>
+    </div>
+    <p class="mini" style="margin:12px 0 0;color:var(--muted)">
+      FIPS build in use (<code>-fips.1-</code>). Your row is highlighted <span style="color:var(--you);font-weight:600">purple</span> in the matrix below.
+      Ingress path is <strong>Contour</strong> (Avi/AKO not in use). cert-manager &amp; Contour versions are tied to the Tanzu Standard repo (<code>v2023.9.19</code>) rather than to VKS itself — confirm exact builds in that repo's release notes.
+    </p>
+  </div>
+
+  <!-- ============================ MATRIX ============================ -->
+  <h2>Compatibility matrix</h2>
   <div class="controls">
-    <input type="search" id="search" placeholder="Search any version — e.g. 8.0 U3, 1.30, VKS 3.5, 9.1…" autocomplete="off">
+    <input type="search" id="search" placeholder="Search any version — e.g. 8.0 U3, 1.26, VKS 3.0, NSX 4.2, contour…" autocomplete="off">
     <span class="chip active" data-era="all">All</span>
     <span class="chip" data-era="VCF 9.x / vSphere 9.x">VCF 9.x</span>
-    <span class="chip" data-era="VCF 5.x / vSphere 8.0">VCF 5.x / vSphere 8</span>
+    <span class="chip" data-era="vSphere 8.0 + NSX (no VCF)">vSphere 8 + NSX</span>
     <span class="chip" data-era="vSphere 7.0 (legacy)">vSphere 7 (legacy)</span>
     <span class="count" id="count"></span>
   </div>
@@ -171,12 +179,16 @@
     <table id="tbl">
       <thead>
         <tr>
-          <th data-k="vcf">VCF Version</th>
+          <th data-k="platform">Platform</th>
           <th data-k="vsphere">vSphere / vCenter</th>
+          <th data-k="nsx">NSX</th>
           <th data-k="released">Released</th>
           <th data-k="supervisor">Supervisor (K8s)</th>
-          <th data-k="vks">VKS Release</th>
-          <th data-k="vkr">VKS K8s (VKr)</th>
+          <th data-k="vks">VKS / TKGs</th>
+          <th data-k="vkr">Guest K8s (VKr/TKr)</th>
+          <th data-k="tanzustd">Tanzu Std repo</th>
+          <th data-k="certmgr">cert-manager</th>
+          <th data-k="contour">Contour</th>
           <th data-k="notes">Notes</th>
         </tr>
       </thead>
@@ -185,66 +197,99 @@
   </div>
   <div class="no-results" id="noResults" style="display:none">No rows match your filter.</div>
 
+  <!-- ============================ DEPLOYED CLUSTERS ============================ -->
+  <h2>Your deployed workload clusters (from inventory)</h2>
+  <div class="tbl-scroll">
+    <table class="mini">
+      <thead>
+        <tr><th>#</th><th>vSphere env</th><th>Workload cluster name</th><th>K8s version</th><th>Ctrl-plane</th><th>Workers</th><th>OS</th></tr>
+      </thead>
+      <tbody id="clusters"></tbody>
+    </table>
+  </div>
+
   <footer>
-    <strong>How the pieces relate:</strong> <em>Supervisor</em> is the Kubernetes control plane embedded in vCenter/ESXi — its bundled K8s version is tied to the <em>vCenter/vSphere patch</em>. <em>VKS</em> (vSphere Kubernetes Service, formerly Tanzu Kubernetes Grid Service / TKGs) is the service that provisions guest ("workload") Kubernetes clusters running <em>VKr</em> (vSphere Kubernetes releases) on top of a Supervisor. Supervisor K8s version and VKS/VKr cluster versions upgrade independently.<br>
-    <strong>Key rules of thumb:</strong> Supervisor minor versions must be upgraded sequentially (e.g. 1.28 → 1.29 → 1.30, no skipping). A given VKS release requires a minimum Supervisor version. Guest cluster (VKr) versions are constrained by the VKS release installed on the Supervisor.<br>
-    Sources: Broadcom TechDocs release notes for vSphere Supervisor, VKS/TKGs, and VCF; Broadcom Interoperability Matrix. Compiled 2026-07 — treat dates/patch mappings as approximate.
+    <strong>How the pieces relate:</strong> <em>Supervisor</em> is the Kubernetes control plane embedded in vCenter/ESXi; its bundled K8s version is tied to the vCenter/vSphere patch. <em>VKS</em> (vSphere Kubernetes Service — formerly Tanzu Kubernetes Grid Service / TKGs) provisions guest ("workload") clusters running <em>VKr/TKr</em> Kubernetes releases on top of a Supervisor. <em>cert-manager</em> and <em>Contour</em> are <em>Tanzu Standard</em> packages (certificate automation and ingress, respectively) installed into workload clusters or as Supervisor Services; their versions come from the <strong>Tanzu Standard repository</strong> version, not from VKS directly. <em>Avi Controller / AKO</em> is the alternative L4–L7 load-balancing/ingress path (NSX Advanced Load Balancer) — not in use in your environment.<br>
+    <strong>Upgrade rules of thumb:</strong> Supervisor minor versions step sequentially (e.g. 1.28 → 1.29 → 1.30, no skips). A given VKS release requires a minimum Supervisor version. Guest (VKr/TKr) versions are bounded by the VKS release on the Supervisor. Package versions (cert-manager, Contour) advance with the Tanzu Standard repo you point clusters at.<br>
+    Sources: Broadcom TechDocs release notes (vSphere Supervisor, VKS/TKGs, Tanzu Standard repository, NSX) and the Broadcom Interoperability Matrix. Compiled 2026-07 — treat dates and patch/package mappings as approximate until verified.
   </footer>
 </div>
 
 <script>
 /* =============================================================================
    EDIT THIS ARRAY to correct or add rows. Fields:
-     era       - grouping label (must match a filter chip's data-era to filter)
-     vcf       - VMware Cloud Foundation version (or "—" if N/A, e.g. standalone vSphere)
-     vsphere   - vSphere / vCenter / ESXi version or patch
-     released  - approximate GA date
-     supervisor- Supervisor build + bundled Kubernetes version(s)
-     vks       - VKS / TKGs release that shipped/was supported with this line
-     vkr       - guest-cluster Kubernetes versions (VKr) available
-     status    - "ga" | "eol" | "patch"  (drives the badge)
-     notes     - free text; dependencies, upgrade-path caveats, etc.
-   NOTE: verify every value against the Broadcom Interoperability Matrix.
+     era        - grouping label (must match a filter chip's data-era to filter)
+     platform   - "vSphere 8 + NSX", "VCF 9.x", etc. (VCF intentionally omitted for
+                  the vSphere-8 rows: environment runs vSphere + NSX, not VCF)
+     vsphere    - vSphere / vCenter / ESXi version or patch (+ build if known)
+     nsx        - NSX version
+     released   - approximate GA date
+     supervisor - Supervisor build + bundled Kubernetes version(s)
+     vks        - VKS / TKGs release
+     vkr        - guest-cluster Kubernetes versions (VKr / TKr) available
+     tanzustd   - Tanzu Standard package repository version
+     certmgr    - cert-manager package version (from the Tanzu Standard repo)
+     contour    - Contour package version (from the Tanzu Standard repo)
+     status     - "ga" | "eol" | "patch"
+     you        - true to highlight the customer's current row
+     notes      - dependencies / upgrade-path caveats
+   VERIFY every value against the Broadcom Interoperability Matrix + repo release notes.
    ============================================================================= */
 const DATA = [
   // ---------------- VCF 9.x / vSphere 9.x (unified versioning) ----------------
-  { era:"VCF 9.x / vSphere 9.x", vcf:"9.1", vsphere:"vSphere 9.1", released:"2025 H2", status:"ga",
+  { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.x", vsphere:"vSphere 9.1", nsx:"4.2.x+", released:"2025 H2", status:"ga",
     supervisor:"Supervisor 9.1", vks:"VKS 3.7", vkr:"1.36, 1.35, 1.34",
-    notes:"VKS 3.7 adds VKr 1.36 (Cluster API v1.13, CAPV v1.16). Supervisor upgraded independently of guest clusters." },
-  { era:"VCF 9.x / vSphere 9.x", vcf:"9.1", vsphere:"vSphere 9.1", released:"2026 (approx)", status:"ga",
+    tanzustd:"2025.x", certmgr:"~1.17.x", contour:"~1.32.x",
+    notes:"VKS 3.7 adds VKr 1.36 (Cluster API v1.13, CAPV v1.16)." },
+  { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.x", vsphere:"vSphere 9.1", nsx:"4.2.x+", released:"2026 (approx)", status:"ga",
     supervisor:"Supervisor 9.1", vks:"VKS 3.6", vkr:"1.35, 1.34, 1.33",
-    notes:"VKS 3.6 adds VKr 1.35. Direct upgrade to VKS 3.6 requires VKS ≥ 3.3 already installed on Supervisor." },
-  { era:"VCF 9.x / vSphere 9.x", vcf:"9.0.2", vsphere:"vSphere 9.0 U2", released:"2025 (approx)", status:"ga",
+    tanzustd:"2025.x", certmgr:"~1.16.x", contour:"~1.30.x",
+    notes:"VKS 3.6 adds VKr 1.35. Direct upgrade to 3.6 needs VKS ≥ 3.3 already on Supervisor." },
+  { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.0.2", vsphere:"vSphere 9.0 U2", nsx:"4.2.x", released:"2025 (approx)", status:"ga",
     supervisor:"Supervisor 9.0.2 (K8s 1.32, 1.31, 1.30)", vks:"VKS 3.5", vkr:"1.34, 1.33, 1.32",
-    notes:"VKS 3.5 (GA Oct 2025) enables VKr 1.34 with 24-month support per K8s minor version. Supervisor 9.0.2 bundles K8s 1.32/1.31/1.30." },
-  { era:"VCF 9.x / vSphere 9.x", vcf:"9.0", vsphere:"vSphere 9.0", released:"2025", status:"ga",
+    tanzustd:"2024.x/2025.x", certmgr:"~1.15.x", contour:"~1.29.x",
+    notes:"VKS 3.5 (GA Oct 2025) enables VKr 1.34 with 24-month support per K8s minor." },
+  { era:"VCF 9.x / vSphere 9.x", platform:"VCF 9.0", vsphere:"vSphere 9.0", nsx:"4.2.x", released:"2025", status:"ga",
     supervisor:"Supervisor 9.0 (K8s 1.32, 1.31)", vks:"VKS 3.4 / 3.3", vkr:"1.33, 1.32, 1.31",
-    notes:"First release of the unified VCF 9 / vSphere 9 line; Supervisor and vCenter share the 9.0 version number." },
+    tanzustd:"2024.x", certmgr:"~1.14.x", contour:"~1.28.x",
+    notes:"First unified VCF 9 / vSphere 9 line; Supervisor shares the 9.0 version." },
 
-  // ---------------- VCF 5.x / vSphere 8.0 ----------------
-  { era:"VCF 5.x / vSphere 8.0", vcf:"5.2.1 / 5.2.2", vsphere:"vCenter/ESXi 8.0 U3+", released:"2024 Q4–2025", status:"ga",
+  // ---------------- vSphere 8.0 + NSX (no VCF) ----------------
+  { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U3+ (8.0.3+)", nsx:"4.2.1 / 4.2.2", released:"2024 Q4–2025", status:"ga",
     supervisor:"Supervisor 8.0 U3 (K8s 1.31, 1.30, 1.29)", vks:"VKS 3.2 / 3.3", vkr:"1.31, 1.30, 1.29, 1.28",
-    notes:"vCenter 8.0 U3h → Supervisor ≥ 1.31; 8.0 U3g → Supervisor ≥ 1.30. Supervisor 8.0 later drops 1.28/1.29." },
-  { era:"VCF 5.x / vSphere 8.0", vcf:"5.2", vsphere:"vCenter/ESXi 8.0 U3", released:"2024-07-24", status:"ga",
-    supervisor:"Supervisor 8.0 U3 (K8s 1.30, 1.29, 1.28)", vks:"VKS 3.1 / 3.0", vkr:"1.30, 1.29, 1.28, 1.27",
-    notes:"vCenter 8.0 U3g and above → Supervisor K8s ≥ 1.30. TKGs rebranded to VKS in this era." },
-  { era:"VCF 5.x / vSphere 8.0", vcf:"5.1.1", vsphere:"vCenter/ESXi 8.0 U2b", released:"2024 Q1", status:"eol",
-    supervisor:"Supervisor 8.0 U2 (K8s 1.28, 1.27, 1.26)", vks:"TKGs 2.x", vkr:"1.28, 1.27, 1.26, 1.25",
-    notes:"vCenter 8.0 U2 b/c/d → Supervisor K8s ≥ 1.28." },
-  { era:"VCF 5.x / vSphere 8.0", vcf:"5.1", vsphere:"vCenter/ESXi 8.0 U2", released:"2023-11-07", status:"eol",
+    tanzustd:"2024.x", certmgr:"~1.14.x", contour:"~1.28.x",
+    notes:"vCenter 8.0 U3h → Supervisor ≥ 1.31; 8.0 U3g → Supervisor ≥ 1.30." },
+  { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U3 base (8.0.3, build 24022515)", nsx:"4.2.2.1.0 (build 24765084)", released:"2024-06 / 2024-07", status:"ga", you:true,
+    supervisor:"Supervisor 8.0 U3 (embedded TKGs 3.0.0)", vks:"VKS/TKGs 3.0.0", vkr:"1.26.x–1.28.x (you: 1.26.13-fips.1-tkg.3)",
+    tanzustd:"2023.9.19", certmgr:"~1.12.2+vmware.2-tkg.1", contour:"~1.24.4+vmware.1-tkg.1",
+    notes:"★ YOUR ENVIRONMENT. TKGs 3.0.0 embedded in vSphere 8.0 U3 base. Ingress via Contour (Avi/AKO not deployed). FIPS guest images. Confirm cert-manager/Contour builds in Tanzu Standard v2023.9.19 release notes." },
+  { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U2 (8.0.2)", nsx:"4.1.2 / 4.2.0", released:"2023-09 / 2024 Q1", status:"eol",
     supervisor:"Supervisor 8.0 U2 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25, 1.24",
-    notes:"NSX 4.1.x, vSAN 8.0 U2. Supervisor minor versions must be stepped sequentially." },
-  { era:"VCF 5.x / vSphere 8.0", vcf:"5.0", vsphere:"vCenter/ESXi 8.0 U1a", released:"2023-06-01", status:"eol",
+    tanzustd:"2023.9.19 / 2023.11.21", certmgr:"~1.12.x", contour:"~1.24.x",
+    notes:"vCenter 8.0 U2 b/c/d → Supervisor K8s ≥ 1.28. Supervisor minors step sequentially." },
+  { era:"vSphere 8.0 + NSX (no VCF)", platform:"vSphere 8 + NSX", vsphere:"8.0 U1 (8.0.1)", nsx:"4.1.0 / 4.1.1", released:"2023-04", status:"eol",
     supervisor:"Supervisor 8.0 U1 (K8s 1.25, 1.24, 1.23)", vks:"TKGs 2.x", vkr:"1.26, 1.25, 1.24, 1.23",
-    notes:"First VCF 5 release. vSphere 8.0 U1a, vSAN 8.0 U1a, NSX 4.1." },
+    tanzustd:"2023.7.x", certmgr:"~1.11.x", contour:"~1.24.x",
+    notes:"Earlier TKGs 2.x line on vSphere 8." },
 
   // ---------------- vSphere 7.0 (legacy) ----------------
-  { era:"vSphere 7.0 (legacy)", vcf:"4.5.x", vsphere:"vCenter/ESXi 7.0 U3v+", released:"2022–2024", status:"eol",
+  { era:"vSphere 7.0 (legacy)", platform:"vSphere 7 + NSX", vsphere:"7.0 U3v+", nsx:"3.2.x / 4.0.x", released:"2022–2024", status:"eol",
     supervisor:"Supervisor 7.0 U3 (K8s 1.27, 1.26, 1.25)", vks:"TKGs 2.x", vkr:"1.27, 1.26, 1.25",
+    tanzustd:"2023.x", certmgr:"~1.11.x", contour:"~1.24.x",
     notes:"vCenter 7.0 U3v → Supervisor K8s 1.27 (last minor on 7.0). vSphere 7 is end-of-general-support." },
-  { era:"vSphere 7.0 (legacy)", vcf:"4.x", vsphere:"vCenter/ESXi 7.0 U1–U3", released:"2020–2022", status:"eol",
-    supervisor:"Supervisor (K8s 1.16–1.24, ships w/ vCenter patch)", vks:"TKGs 1.x / 2.0", vkr:"1.16 – 1.24",
-    notes:"Original 'vSphere with Tanzu' era. Supervisor K8s version was tightly coupled to each vCenter 7.0 patch." },
+  { era:"vSphere 7.0 (legacy)", platform:"vSphere 7 + NSX", vsphere:"7.0 U1–U3", nsx:"3.0.x–3.2.x", released:"2020–2022", status:"eol",
+    supervisor:"Supervisor (K8s 1.16–1.24, per vCenter patch)", vks:"TKGs 1.x / 2.0", vkr:"1.16 – 1.24",
+    tanzustd:"n/a (TKG extensions)", certmgr:"1.1.x–1.10.x", contour:"1.17.x–1.22.x",
+    notes:"Original 'vSphere with Tanzu' era. Supervisor K8s tightly coupled to each vCenter 7.0 patch." },
+];
+
+/* Customer's deployed workload clusters (from the supplied inventory table). */
+const CLUSTERS = [
+  { n:1, env:"sy6prodns", name:"sy6-tanzu-prd-antrea-cluster",  k8s:"v1.26.13---vmware.1-fips.1-tkg.3", cp:3, w:8,  os:"photon" },
+  { n:2, env:"sy7prodns", name:"sy7-tanzu-test-antrea-cluster", k8s:"v1.26.13---vmware.1-fips.1-tkg.3", cp:3, w:3,  os:"photon" },
+  { n:"", env:"",         name:"sy7tanzudrclus2",               k8s:"v1.26.13---vmware.1-fips.1-tkg.3", cp:3, w:7,  os:"photon" },
+  { n:"", env:"",         name:"sy7-tanzu-infra-cluster",       k8s:"v1.26.13---vmware.1-fips.1-tkg.3", cp:3, w:8,  os:"photon" },
+  { n:"", env:"",         name:"sy7-tanzu-npe-antrea-cluster",  k8s:"v1.26.13---vmware.1-fips.1-tkg.3", cp:3, w:12, os:"photon" },
 ];
 
 const badgeFor = s =>
@@ -263,18 +308,14 @@ let sortKey = null, sortDir = 1;
 
 function rowMatches(r, q) {
   if (!q) return true;
-  const hay = [r.vcf, r.vsphere, r.released, r.supervisor, r.vks, r.vkr, r.notes].join(' ').toLowerCase();
+  const hay = [r.platform, r.vsphere, r.nsx, r.released, r.supervisor, r.vks, r.vkr, r.tanzustd, r.certmgr, r.contour, r.notes].join(' ').toLowerCase();
   return q.toLowerCase().split(/\s+/).every(t => hay.includes(t));
 }
 
 function render() {
   const q = search.value.trim();
-  let rows = DATA.filter(r =>
-    (activeEra === 'all' || r.era === activeEra) && rowMatches(r, q)
-  );
-  if (sortKey) {
-    rows = [...rows].sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : -1) * sortDir);
-  }
+  let rows = DATA.filter(r => (activeEra === 'all' || r.era === activeEra) && rowMatches(r, q));
+  if (sortKey) rows = [...rows].sort((a, b) => ((a[sortKey] ?? '') > (b[sortKey] ?? '') ? 1 : -1) * sortDir);
 
   tbody.innerHTML = '';
   let lastEra = null;
@@ -283,22 +324,33 @@ function render() {
       lastEra = r.era;
       const er = tbody.insertRow();
       er.className = 'era-row';
-      const c = er.insertCell();
-      c.colSpan = 7;
-      c.textContent = r.era;
+      const c = er.insertCell(); c.colSpan = 11; c.textContent = r.era;
     }
     const tr = tbody.insertRow();
+    if (r.you) tr.className = 'you-row';
     tr.innerHTML = `
-      <td class="ver">${r.vcf} ${badgeFor(r.status)}</td>
+      <td class="ver">${r.platform} ${r.you ? '<span class="badge you">★ YOU</span>' : badgeFor(r.status)}</td>
       <td class="ver">${r.vsphere}</td>
+      <td class="ver">${r.nsx}</td>
       <td>${r.released}</td>
       <td class="k8s">${r.supervisor}</td>
       <td class="ver">${r.vks}</td>
       <td class="k8s">${r.vkr}</td>
+      <td class="ver">${r.tanzustd}</td>
+      <td class="k8s">${r.certmgr}</td>
+      <td class="k8s">${r.contour}</td>
       <td class="notes">${r.notes}</td>`;
   }
   noResults.style.display = rows.length ? 'none' : 'block';
   countEl.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
+}
+
+/* deployed clusters table */
+const cbody = document.getElementById('clusters');
+for (const c of CLUSTERS) {
+  const tr = cbody.insertRow();
+  tr.innerHTML = `<td>${c.n}</td><td class="ver">${c.env}</td><td class="ver">${c.name}</td>
+    <td class="k8s">${c.k8s}</td><td>${c.cp}</td><td>${c.w}</td><td>${c.os}</td>`;
 }
 
 chips.forEach(ch => ch.addEventListener('click', () => {
@@ -307,13 +359,11 @@ chips.forEach(ch => ch.addEventListener('click', () => {
   activeEra = ch.dataset.era;
   render();
 }));
-
-document.querySelectorAll('thead th').forEach(th => th.addEventListener('click', () => {
+document.querySelectorAll('thead th[data-k]').forEach(th => th.addEventListener('click', () => {
   const k = th.dataset.k;
   if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; }
   render();
 }));
-
 search.addEventListener('input', render);
 render();
 </script>
