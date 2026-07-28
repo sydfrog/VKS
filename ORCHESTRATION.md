@@ -149,6 +149,36 @@ WebSocket for progress, systemd + nginx.** If you'd rather have a single binary
 to drop on the box, say so and I'll write it in Go instead — the architecture
 below is language-agnostic.
 
+### ▢ DECISION 4.8 — How the app is packaged and run
+
+Independent of 4.2. **4.2 is "where does VCDT run"; this is "how does the app
+itself get deployed".** Either answer gives you the same thing in the browser —
+a web server on this host that you reach at e.g. `https://depot.lab.local`.
+
+| Option | Trade-off |
+|---|---|
+| **Docker Compose** ⭐ | Two services: `app` and `nginx`. Depot bind-mounted in, SQLite on a named volume, TLS certs mounted read-only. Clean install and clean uninstall, no Python on the host, trivially reproducible. |
+| systemd unit on the host | Fewer layers, direct filesystem access, nothing to rebuild. Requires the right Python on the box and drifts as the distro upgrades. |
+| Single Go binary + systemd | Only if 4.4 lands on Go. Copy one file, no runtime at all. |
+
+**If you go with containers, bind-mount VCDT from the host rather than baking it
+into the image** — `/opt/vcdt:/opt/vcdt:ro`. Broadcom updates VCDT on their
+schedule; you shouldn't have to rebuild an image to take a new version, and
+`version_pin` in §11 then reflects what's actually mounted.
+
+Two consequences to be aware of either way:
+
+- **The depot bind mount must be the real depot path**, and the container user's
+  UID needs write access to it. Mismatched UIDs on a bind mount is the most
+  common way this setup fails on first run.
+- **Free-space reporting reads the host mount**, not the container's overlay
+  filesystem. The scanner must `statvfs` the depot path specifically, or the
+  dashboard will confidently report the wrong number.
+
+**Recommendation: Docker Compose, VCDT bind-mounted from the host.** It matches
+how you'd likely run other infrastructure tooling, and it makes the "wipe it and
+start again" path painless while we iterate.
+
 ### ▢ DECISION 4.5 — Catalog freshness
 
 Does the UI's "what can I download" list come from:
@@ -363,13 +393,39 @@ Five screens. Dark-first, matching the visual language of the existing
 
 ## 10. Deployment
 
-- systemd unit for the app; nginx in front for TLS and static assets.
+Shape depends on **DECISION 4.8**. Under either answer you get the same thing
+from a browser: a web server on this host, TLS-terminated by nginx.
+
+**If Docker Compose (recommended):**
+
+```yaml
+services:
+  app:                    # FastAPI + job runner + scanner
+    volumes:
+      - /srv/vcf-depot:/srv/vcf-depot      # the depot, read-write
+      - /opt/vcdt:/opt/vcdt:ro             # vendor binary, host-owned
+      - state:/var/lib/vcf-depot           # SQLite
+      - /etc/vcf-depot:/etc/vcf-depot:ro   # config + credential, 0600 on host
+    user: "<uid>:<gid>"                    # must match depot ownership
+  nginx:
+    ports: ["443:443"]
+    volumes:
+      - certs:/etc/nginx/certs:ro
+```
+
+**If systemd:** unit for the app, nginx in front, hardening flags per §9.
+
+**Common to both:**
+
 - Depot on its own mount if possible — a full disk should degrade downloads,
   not take out the OS.
-- SQLite in WAL mode, on the OS disk rather than the depot mount.
+- SQLite in WAL mode, and **not** on the depot mount.
 - Backup: the SQLite file (small, and the only irreplaceable state). The depot
   itself is re-downloadable.
 - Config: one YAML file, environment-overridable. Draft in §11.
+- The container does not need `--privileged`, host networking, or the Docker
+  socket. If a future change appears to need any of those, that's a design
+  error worth raising rather than granting.
 
 ---
 
@@ -473,6 +529,9 @@ Copy this block, fill it in, hand it back — that's all I need to start Phase 0
 ```
 4.1  Scope:              A+B+verify (default)  /  also C  /  also D  /  other:
 4.2  VCDT execution:     local (default)  /  container  /  ssh
+4.8  App packaging:      compose (default)  /  systemd on host  /  Go binary
+     ^ if compose: depot path to bind-mount = 
+                   UID:GID that owns it     = 
 4.3  Auth:               single user (default)  /  multi-user  /  none  /  SSO
 4.4  Stack:              Python+FastAPI (default)  /  Node+React  /  Go
 4.5  Catalog:            cached+refresh (default)  /  live
