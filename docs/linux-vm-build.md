@@ -29,8 +29,22 @@ figures and you can size properly — the app's selection screen (§8) shows the
 projected total before you commit to a download.
 
 **Guest OS: Ubuntu 24.04 LTS.** Broad tooling, current Docker packages, easy
-cloud-init. Photon OS is the VMware-native alternative and appears in several
-community offline-depot writeups; either is fine. Commands below assume Ubuntu.
+cloud-init. Commands below assume Ubuntu.
+
+`scripts/setup-depot-host.sh` also supports the RHEL family — Rocky, AlmaLinux,
+CentOS Stream and RHEL — so switching later is a different base image, not a
+rewrite. Two differences it handles automatically there:
+
+- **SELinux is enforcing**, so the depot and `/opt/vcdt` need
+  `container_file_t` labels or every bind mount fails in a way that looks like
+  a permissions bug. The script sets them persistently rather than using
+  Docker's `:z` flag, which would relabel the whole depot on every run.
+- **Docker CE has no packages for the newest CentOS Stream**, so the script
+  falls back to `podman`, which ships natively there.
+
+Note that **CentOS Linux itself is end-of-life** (7 ended June 2024, 8 in
+2021). If you want the RHEL family, use CentOS Stream 10, Rocky, or AlmaLinux —
+not CentOS 7/8.
 
 ---
 
@@ -83,60 +97,25 @@ network:
       # nameservers: {addresses: [10.0.0.1]}
 ```
 
-`userdata.yaml` — creates the user, installs Docker, prepares the depot mount:
+`userdata.yaml` — just the user and the base packages. Storage, Docker,
+firewall and directory layout are handled afterwards by
+`scripts/setup-depot-host.sh`, which is idempotent and refuses to format a disk
+that already holds data. Doing it there rather than inline means a mistake is
+recoverable by re-running a script, not by rebuilding the VM.
 
 ```yaml
 #cloud-config
 users:
   - name: depot
-    groups: [sudo, docker]
+    groups: [sudo]
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_authorized_keys:
       - ssh-ed25519 AAAA...   # your public key
 
 package_update: true
-packages: [ca-certificates, curl, gnupg, tree, jq, unzip, xfsprogs]
-
-write_files:
-  - path: /etc/systemd/system/srv-vcf\x2ddepot.mount
-    content: |
-      [Unit]
-      Description=VCF depot storage
-      [Mount]
-      What=/dev/disk/by-label/vcfdepot
-      Where=/srv/vcf-depot
-      Type=xfs
-      Options=defaults,noatime
-      [Install]
-      WantedBy=multi-user.target
-
-runcmd:
-  # Docker from the official repo
-  - install -m 0755 -d /etc/apt/keyrings
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-  - chmod a+r /etc/apt/keyrings/docker.asc
-  - echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-  # Second disk -> /srv/vcf-depot. Guarded so a re-run cannot wipe a live depot.
-  - |
-    if [ -b /dev/sdb ] && ! blkid /dev/sdb; then
-      mkfs.xfs -L vcfdepot /dev/sdb
-    fi
-  - mkdir -p /srv/vcf-depot
-  - systemctl daemon-reload
-  - systemctl enable --now srv-vcf\x2ddepot.mount
-  - chown -R depot:depot /srv/vcf-depot
-
-  - mkdir -p /opt/vcdt /etc/vcf-depot
-  - chown depot:depot /opt/vcdt /etc/vcf-depot
-  - chmod 750 /etc/vcf-depot
+packages: [ca-certificates, curl, gnupg, git, tree, jq, unzip, xfsprogs, open-vm-tools]
 ```
-
-> The `\x2d` in the mount unit filename is systemd's escape for `-` in a path.
-> The unit name **must** match the mount point or systemd ignores it.
 
 ### 4. Import and configure
 
@@ -161,13 +140,28 @@ govc vm.ip vcf-depot-01
 
 `base64 -w0` is GNU. On macOS use `base64 -i metadata.yaml` (no wrap flag).
 
-### 5. Verify
+### 5. Finish the host setup
 
 ```sh
 ssh depot@<ip>
+git clone https://github.com/sydfrog/VKS.git && cd VKS
+
+lsblk                              # identify the depot disk — do not assume /dev/sdb
+sudo ./scripts/setup-depot-host.sh --depot-device /dev/sdb --dry-run
+sudo ./scripts/setup-depot-host.sh --depot-device /dev/sdb
+```
+
+The script installs Docker, formats and mounts the depot disk, creates
+`/opt/vcdt` and `/etc/vcf-depot`, opens the firewall, and prints a summary
+block to send back — that block is exactly NEED 3.6 in the orchestration file.
+
+Run `--dry-run` first. It prints every action without taking any.
+
+### 6. Verify
+
+```sh
 df -h /srv/vcf-depot     # depot disk mounted, right size
 docker run --rm hello-world
-lsblk
 ```
 
 ---
@@ -176,32 +170,13 @@ lsblk
 
 1. **Deploy OVF Template** → the Ubuntu cloud image OVA (or install from ISO).
 2. 4 vCPU, 8 GB RAM, 60 GB OS disk. **Add a second disk**, 1 TB, thin.
-3. Boot, log in, then:
+3. Boot, log in, then run the same setup script as Path A step 5.
 
-```sh
-# Depot disk — CONFIRM the device name first; lsblk shows sizes.
-lsblk
-sudo mkfs.xfs -L vcfdepot /dev/sdb
-sudo mkdir -p /srv/vcf-depot
-echo 'LABEL=vcfdepot /srv/vcf-depot xfs defaults,noatime 0 2' | sudo tee -a /etc/fstab
-sudo mount -a
-df -h /srv/vcf-depot
-
-# Docker
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker "$USER"
-newgrp docker
-
-# Layout the app expects
-sudo mkdir -p /opt/vcdt /etc/vcf-depot
-sudo chown "$USER:$USER" /opt/vcdt /etc/vcf-depot /srv/vcf-depot
-sudo chmod 750 /etc/vcf-depot
-
-sudo apt-get install -y tree jq unzip
-```
-
-**Check `lsblk` before running `mkfs`.** `/dev/sdb` is the usual name for the
-second disk, but it is not guaranteed — formatting the wrong device destroys it.
+**`--depot-device` is required and never guessed.** `/dev/sdb` is the usual
+name for a second disk but is not guaranteed; check `lsblk` first. The script
+refuses to touch a device that is mounted or already carries a filesystem, and
+asks you to retype the path before formatting — but the device you name is
+still the device it formats.
 
 ---
 
