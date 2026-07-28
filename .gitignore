@@ -1,0 +1,24 @@
+# Never commit the VCDT binary or any vendor archive — licensed redistributable,
+# large, and git keeps blobs forever even after deletion.
+vcdt-reference/bin/
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rpm
+*.deb
+*.ova
+*.iso
+
+# Never commit credentials.
+*.cred
+*.token
+*credential*
+*.pem
+*.key
+!*.md
+
+# Scratch
+*.swp
+.DS_Store
+__pycache__/
