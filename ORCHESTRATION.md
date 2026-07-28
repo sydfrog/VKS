@@ -487,7 +487,7 @@ serving:
 | Phase | Deliverable | Depends on |
 |---|---|---|
 | 0 | Repo skeleton, config loader, systemd unit, "it starts and serves a page" | 4.4 |
-| 1 | **VCDT adapter + a `--dry-run` CLI that prints the parsed catalog** — proves the integration before any UI exists | 3.1–3.3 |
+| 1 | **VCDT adapter + a `selftest` CLI** — runs on *your* server, exercises the parser against live VCDT, prints a structured mismatch report to paste back. Proves the integration before any UI exists. See note below. | 3.1–3.3 |
 | 2 | Catalog cache, selection tree UI, size/space projection | 1, 4.5, 4.7 |
 | 3 | Job queue, runner, live progress over WebSocket, job history | 2, 4.6 |
 | 4 | Inventory scanner, repository screen, have/missing/orphan reconciliation | 3, 3.4 |
@@ -497,6 +497,19 @@ serving:
 
 Phase 1 is the one that can invalidate assumptions. Nothing else should start
 until a real catalog parses.
+
+**Phase 1 runs on your server, not mine.** The adapter can only be validated
+against live VCDT output — real catalog JSON, real progress rendering, real
+auth failures — and that exists nowhere except on a host with a valid
+entitlement and a route to the Broadcom depot. Sending me the binary does not
+change this; it yields `--help` and nothing more.
+
+So Phase 1 ships as a `selftest` command with no dependencies beyond the
+standard library: you run it next to VCDT, it drives the real tool, checks each
+parser against what actually comes back, and emits a report of what it could
+and couldn't interpret. You paste the report back, I correct the parser, repeat.
+Two or three rounds should converge. Everything the loop needs stays inside your
+network.
 
 ---
 

@@ -51,16 +51,53 @@ vcdt <download subcommand> <args> 2>&1 | tee progress-sample.txt
 Let it run a minute or two, then interrupt it — that's enough to see how it
 reports progress, which is the single biggest open question (Risk R1).
 
+## ⚠ This repository is public
+
+`sydfrog/VKS` is a **public** GitHub repository. Two consequences:
+
+**Never commit the VCDT binary here.** Publishing a licensed Broadcom binary to
+a public repo is redistribution, and git retains blobs after deletion — undoing
+it means rewriting history, not removing a file.
+
+**Review capture output before committing it.** The redaction pass catches
+credential-shaped patterns, but catalog and manifest output may also carry
+things you'd rather not publish: entitlement or site identifiers, account
+references, internal hostnames and IPs, proxy addresses, depot URLs specific to
+your organisation. None of that is secret in the credential sense, and none of
+it is something I need.
+
+If in doubt, paste into chat instead of committing. Nothing here is so large
+that the repo is the only viable channel.
+
 ## Getting the files to me
 
-Any of these work:
-
-1. **Paste into chat.** Fine for `--help` output; easiest for a quick answer on
-   one specific thing.
-2. **Commit them to this branch** (`claude/vcf-download-repo-web-8etf58`) from
-   your machine, or add them through the GitHub web UI. Best option — they
-   become part of the repo's record and I can re-read them later.
+1. **Paste into chat.** Best default. Fine for `--help`, catalog samples and
+   progress output, and nothing lands in a public repo.
+2. **Commit to this branch** (`claude/vcf-download-repo-web-8etf58`) — good for
+   anything we'll want to re-read across sessions, once reviewed per the note
+   above.
 3. **Attach the files** in the Claude interface if your client supports it.
+
+### If you want me to have the binary itself
+
+Understand what it buys first — less than it seems. From my side it yields
+`--version`, `--help`, subcommand discovery, and static inspection of the flag
+surface. It cannot yield a catalog listing, progress output, or failure
+behaviour: those need authentication and a route to the Broadcom depot, and
+this environment has neither (egress to Broadcom is blocked at the proxy).
+
+That is the same information you can capture in a minute with `capture.sh`, so
+it's rarely worth the trouble. If you do want it available anyway, put it in a
+**separate private repository** and I can be given access to that — never here.
+
+### The part that has to happen on your server either way
+
+No copy of the binary lets me validate the parser against *real* catalog JSON or
+*real* progress output — that data exists only on an entitled, connected host.
+So Phase 1 (§12) ships as a self-testing adapter: a `selftest` command you run
+on your server that exercises the parser against live VCDT and prints a
+structured mismatch report. You paste the report back; I fix the parser. The
+binary never leaves your network and the loop stays tight.
 
 ## Why progress output matters so much
 
