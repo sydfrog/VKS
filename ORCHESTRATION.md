@@ -187,9 +187,18 @@ My default if you say nothing: **A + B + checksum verify + have/offered diff.**
 | Container per job | Cleaner isolation and version pinning; adds a runtime dependency and volume plumbing, and complicates progress capture. |
 | Remote host over SSH | Only justified if the depot must live on separate storage. Adds key management and makes the inventory scanner remote too. |
 
-**Recommendation: local binary, same host.** Move to containers only if you want
-to run several VCDT versions side by side. Note the adapter (§7.2) is written so
-this can change later without touching the UI.
+~~Recommendation: local binary, same host.~~
+
+**✅ DECIDED — container.** You want everything to run in a Linux host or a
+container you can hand to colleagues, which outweighs the simplicity argument
+for the local binary. The adapter (§7.2) abstracts this, so `mode: local`
+stays supported for anyone who prefers it.
+
+**A constraint follows: the image must not contain VCFDT.** Baking a licensed
+Broadcom binary into a distributable image is redistribution — the same
+objection as committing it to the public repo. The shareable artifact is the
+Dockerfile and tooling; each user supplies their own VCFDT download and their
+own token, both bind-mounted at run time. See `vcdt-container/`.
 
 ### ▢ DECISION 4.3 — Authentication
 
@@ -242,9 +251,12 @@ Two consequences to be aware of either way:
   filesystem. The scanner must `statvfs` the depot path specifically, or the
   dashboard will confidently report the wrong number.
 
-**Recommendation: Docker Compose, VCDT bind-mounted from the host.** It matches
-how you'd likely run other infrastructure tooling, and it makes the "wipe it and
-start again" path painless while we iterate.
+**✅ DECIDED — Docker Compose, VCDT bind-mounted from the host.** Consistent
+with 4.2 and with wanting a portable, shareable setup.
+
+**✅ Target host DECIDED — a Linux VM on your vSphere/VCF cluster.** Build guide
+and scripts in `docs/linux-vm-build.md`. Sizing is driven by the depot, which is
+the only large thing here.
 
 ### ▢ DECISION 4.5 — Catalog freshness
 
