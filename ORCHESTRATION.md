@@ -94,6 +94,73 @@ into chat; §9 covers how it gets stored.
 
 ---
 
+## 3A. What public documentation already tells us
+
+> **Provenance caveat — read this before relying on anything below.** Broadcom
+> TechDocs, williamlam.com and cloudbuildtools.com are all blocked by this
+> environment's proxy (HTTP 403), so the following is assembled from **search
+> result snippets, not from reading the pages**. Treat every item as provisional
+> and version-drifted until confirmed against the real `--help`. It narrows the
+> guesswork; it does not replace NEED 3.2.
+
+**The tool is `vcf-download-tool`**, and it is **a Java application bundling a
+Linux-compiled JRE**. That last detail is inferred from the documented macOS
+failure mode — "Exec format error" from the bundled runtime — and the documented
+workaround of pointing it at a native Java path.
+
+**Command shape** appears to be `vcf-download-tool <group> <verb> [flags]`, with
+a `binaries` group covering list, download, upload and cleanup.
+
+Flags seen in examples:
+
+| Flag | Apparent purpose |
+|---|---|
+| `--depot-download-token-file` | Path to the download token. **Confirms NEED 3.5: file-based, not inline** — good, it means the credential never touches argv. |
+| `--depot-download-activation-code-file` | Alternative credential form |
+| `--depot-store` | Depot root on disk → maps to `depot.root` in §11 |
+| `--vcf-version` | e.g. `9.0.0`, `9.0.1`, `5.2.0` |
+| `--type` | e.g. `INSTALL` — install vs upgrade vs patch |
+| `--sku` | e.g. `VCF` — VCF vs VVF |
+| `--component` | Filter to one component |
+| `--automated-install` | Bulk "everything for this version" |
+| `-h`, `--help` | Help |
+
+Example invocations from the wild:
+
+```
+vcf-download-tool binaries list \
+    --depot-download-token-file=<path> --vcf-version=5.2.0
+
+vcf-download-tool binaries download \
+    --depot-download-token-file=<path> --depot-store=/var/www/offline_depot \
+    --vcf-version=9.0.0 --type=INSTALL
+```
+
+**`binaries list` reportedly requires at least one filter.** If so the catalog
+cache (§4.5) cannot be populated by a single unfiltered call — it needs a sweep
+across versions/SKUs. That changes the refresh job's shape and is worth
+confirming early.
+
+### Platform support — relevant to running the capture at all
+
+- **Linux:** supported. Photon OS appears in several community offline-depot writeups.
+- **Windows:** no native binary; **WSL2 is the supported route**.
+- **macOS:** not supported, but works by overriding the bundled JRE with a native one.
+
+### What this changes
+
+- **NEED 3.5 is provisionally answered** — token-in-a-file. §9's "never pass the
+  credential via argv" holds, and the adapter passes a path.
+- **Risk R1 improves.** A Java CLI is much more likely to emit line-oriented log
+  output than a redrawing ANSI progress bar. Not a guarantee — plenty of Java
+  CLIs use progress-bar libraries — but the odds moved in our favour.
+- **DECISION 4.2 gets easier.** A self-contained Java tree with a bundled JRE
+  bind-mounts into a container cleanly, with no host runtime dependency.
+- **§4.7 selection granularity** looks feasible: `--sku`, `--vcf-version`,
+  `--type` and `--component` are roughly the tree levels the UI wants.
+
+---
+
 ## 4. Decision points
 
 Each has a recommendation. If the recommendation is right, write "yes" and move on.
@@ -517,7 +584,8 @@ network.
 
 | # | Risk | Mitigation |
 |---|---|---|
-| **R1** | **VCDT reports progress in a form we can't parse** — no machine-readable output, or a redrawing TTY progress bar that produces unusable output when not attached to a terminal. This is the single most likely thing to make the UI worse than planned. | NEED 3.3 answers it before we commit. Fallbacks, in order: run under a pseudo-terminal to coax the interactive renderer; derive progress from watching file sizes in the depot; degrade to "running, *N* minutes elapsed, *X* GB written" with the raw log visible. Plan for the fallback; be pleased if we don't need it. |
+| **R1** | **VCDT reports progress in a form we can't parse** — no machine-readable output, or a redrawing TTY progress bar that produces unusable output when not attached to a terminal. Still the most likely thing to make the UI worse than planned, though §3A downgrades it somewhat: a Java CLI tends toward line-oriented logging. | NEED 3.3 answers it before we commit. Fallbacks, in order: run under a pseudo-terminal to coax the interactive renderer; derive progress from watching file sizes land in the depot (reliable here, since `--depot-store` means we know exactly where they go); degrade to "running, *N* minutes elapsed, *X* GB written" with the raw log visible. Plan for the fallback; be pleased if we don't need it. |
+| **R8** | **§3A is snippet-derived, not read from source** — flags may be misspelled, renamed between 9.0 and 9.1, or absent. Building the adapter directly against it would bake in errors. | §3A is used only to shape the adapter's structure and to write the `selftest` probes. Every flag is confirmed against real `--help` output before it reaches a code path that runs. |
 | R2 | Catalog granularity is coarser than §4.7 assumes | Selector collapses to whatever level VCDT exposes. UI copes; the model already allows a release with one implicit bundle. |
 | R3 | Long downloads outlive sessions, proxies, or the app process | Job state lives in SQLite, not memory; runner is a subprocess whose output is persisted as it arrives; interrupted jobs are detected on boot and are resumable per-item. |
 | R4 | Disk fills mid-job | `min_free_gb` pre-flight check at queue time, projected-usage figure at selection time, and a runtime abort with a clear message rather than a truncated file. |

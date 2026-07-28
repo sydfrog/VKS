@@ -28,6 +28,21 @@ Plain text only. All of it small.
 | `depot-manifest-sample.*` | Any index/manifest file VCDT writes into the depot | 3.4 |
 | `env.txt` | Distro, arch, depot mount, free space, proxy in path? | 3.6 |
 
+## No Linux machine yet?
+
+VCFDT is a Java application with a **bundled Linux JRE**, so it needs a Linux
+userspace — but not a Linux server. Any of these is enough to produce the
+capture (see `../ORCHESTRATION.md` §3A):
+
+- **Windows → WSL2.** Broadcom's supported Windows route. `wsl --install`,
+  then run VCFDT inside the Linux distro. Roughly ten minutes.
+- **macOS → override the bundled JRE** with a native macOS Java runtime. The
+  bundled Linux one produces `Exec format error`; the tool itself is fine.
+- **A small cloud VM**, or a Linux VM on any hypervisor you already have.
+
+None of these is the eventual production host — that needs real disk for the
+depot. They only need to run VCFDT long enough to capture its interface.
+
 ## Fastest path
 
 Run `capture.sh` on the server that has VCDT:
