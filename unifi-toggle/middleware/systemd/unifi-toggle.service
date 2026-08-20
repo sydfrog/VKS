@@ -3,6 +3,12 @@ Description=UniFi policy toggle middleware
 After=network-online.target
 Wants=network-online.target
 
+# Never stop retrying. The rate limit keys live in [Unit], not [Service];
+# systemd silently ignores them in [Service] and falls back to the default of
+# 5 starts per 10 seconds, after which it gives up and stays failed.
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
 [Service]
 Type=simple
 User=unifi-toggle
@@ -15,10 +21,9 @@ EnvironmentFile=/etc/unifi-toggle/unifi-toggle.env
 WorkingDirectory=/opt/unifi-toggle
 ExecStart=/opt/unifi-toggle/venv/bin/python -m unifi_toggle
 
-# Restart on failure, and keep trying rather than giving up after 5 attempts.
+# Restart on failure. The give up limit is disabled in [Unit] above.
 Restart=on-failure
 RestartSec=5
-StartLimitIntervalSec=0
 
 # Logs go to the journal. Read them with: journalctl -u unifi-toggle -f
 StandardOutput=journal

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -54,3 +55,80 @@ def test_probe_script_has_no_fstring_backslash():
         stripped = line.strip()
         if stripped.startswith(("print(f", "f\"")) or 'f"' in stripped:
             assert "\\" not in stripped, f"f-string with a backslash: {stripped}"
+
+
+UNIT_FILE = Path(__file__).resolve().parents[1] / "systemd" / "unifi-toggle.service"
+
+
+def _systemd_analyze() -> str | None:
+    return shutil.which("systemd-analyze")
+
+
+@pytest.mark.skipif(_systemd_analyze() is None, reason="systemd-analyze not installed")
+def test_systemd_unit_has_no_unknown_keys():
+    """systemd ignores misplaced keys with only a warning, so treat it as an error.
+
+    This caught StartLimitIntervalSec sitting in [Service], where systemd drops
+    it and quietly applies the default give up limit of 5 starts per 10 seconds.
+    The unit looked correct and behaved differently.
+    """
+    result = subprocess.run(
+        [_systemd_analyze(), "verify", str(UNIT_FILE)],
+        capture_output=True,
+        text=True,
+    )
+    noise = result.stdout + result.stderr
+    problems = [
+        line
+        for line in noise.splitlines()
+        if line.strip()
+        # Only present when the unit is checked off a real install.
+        and "Unit configuration has fatal error" not in line
+    ]
+    assert not problems, "systemd-analyze verify reported:\n" + "\n".join(problems)
+
+
+def _unit_sections(text: str) -> dict[str, list[str]]:
+    """Split a unit file into sections, keeping only real directives.
+
+    Comments are dropped. Splitting on the bare string "[Service]" would also
+    match the word inside a comment, which is how the first version of this
+    test managed to fail against a correct file.
+    """
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = line
+            sections[current] = []
+        elif current is not None:
+            sections[current].append(line)
+    return sections
+
+
+def test_restart_limit_is_disabled_in_the_unit_section():
+    """Pin the placement, so it cannot drift back into [Service]."""
+    sections = _unit_sections(UNIT_FILE.read_text())
+    unit = sections["[Unit]"]
+    service = sections["[Service]"]
+    assert "StartLimitIntervalSec=0" in unit
+    assert not [d for d in service if d.startswith("StartLimit")], (
+        "StartLimit keys in [Service] are silently ignored by systemd"
+    )
+
+
+def test_unit_parser_ignores_comments():
+    """Guard the helper above, since its first version was fooled by a comment."""
+    sample = "[Unit]\n# mentions [Service] in a comment\nStartLimitIntervalSec=0\n\n[Service]\nType=simple\n"
+    sections = _unit_sections(sample)
+    assert sections["[Unit]"] == ["StartLimitIntervalSec=0"]
+    assert sections["[Service]"] == ["Type=simple"]
+
+
+def test_unit_restarts_on_failure():
+    text = UNIT_FILE.read_text()
+    assert "Restart=on-failure" in text
+    assert "WantedBy=multi-user.target" in text
