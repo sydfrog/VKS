@@ -62,10 +62,13 @@ Use the VM's LAN address, not `localhost` and not a name that is not in DNS:
 
 ```bash
 sudo /opt/unifi-toggle/scripts/make-cert.sh <vm-ip> /etc/unifi-toggle/tls
-sudo chown root:unifi-toggle /etc/unifi-toggle/tls/*
-sudo chmod 0640 /etc/unifi-toggle/tls/server.key /etc/unifi-toggle/tls/ca.key
-sudo chmod 0644 /etc/unifi-toggle/tls/ca.crt /etc/unifi-toggle/tls/server-fullchain.pem
 ```
+
+Run it with sudo. It sets ownership and modes itself: `server.key` becomes
+`0640 root:unifi-toggle` so the service can read it, `server-fullchain.pem` and
+`ca.crt` become world readable, and `ca.key` stays `0600 root:root` because
+nothing but this script ever needs it again. There is nothing to chmod
+afterwards, and the script prints the resulting listing so you can see it.
 
 This makes a small private CA and one server certificate signed by it. Android
 pins trust anchors, and a trust anchor has to be a CA certificate, so a lone self
@@ -299,6 +302,7 @@ curl -sk -H "Authorization: Bearer $TOKEN" https://127.0.0.1:8080/status
 | What you see | What it means |
 | --- | --- |
 | `venv/bin/pip: No such file or directory` during install | An earlier run left a half built virtualenv. Re-run `sudo scripts/install.sh`, which now detects and rebuilds it. Install `python3-venv` first. |
+| `PermissionError: [Errno 13]` in the log, service restarting | The service user cannot read the TLS key. Re-run `make-cert.sh` with sudo, which sets the ownership. Current builds report this as a named configuration error instead. |
 | `configuration error: ...` and the service will not start | A required variable is missing or malformed. The message names it. |
 | HTTP 401 | No bearer token was sent. |
 | HTTP 403 | The token does not match `API_TOKEN`. |

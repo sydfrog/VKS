@@ -146,8 +146,20 @@ def load_settings() -> Settings:
     if bool(tls_cert) != bool(tls_key):
         raise ConfigError("set both TLS_CERT_FILE and TLS_KEY_FILE, or neither")
     for label, path in (("TLS_CERT_FILE", tls_cert), ("TLS_KEY_FILE", tls_key)):
-        if path and not os.path.isfile(path):
+        if not path:
+            continue
+        if not os.path.isfile(path):
             raise ConfigError(f"{label} points at {path!r} which is not a file")
+        # Existence is not enough. The service runs unprivileged, and a key
+        # left at 0600 root:root makes uvicorn die deep inside its TLS setup
+        # with a bare PermissionError and no mention of which file. Check it
+        # here, where we can name the file and the fix.
+        if not os.access(path, os.R_OK):
+            raise ConfigError(
+                f"{label} at {path!r} exists but is not readable by this user. "
+                f"Fix it with: sudo chown root:unifi-toggle {path} && "
+                f"sudo chmod 0640 {path}"
+            )
 
     auth_mode = _env_choice("UNIFI_AUTH_MODE", "auto", VALID_AUTH_MODES)
     api_key = _env("UNIFI_API_KEY")

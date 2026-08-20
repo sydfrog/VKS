@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from unifi_toggle.config import ConfigError, load_settings
@@ -180,3 +182,57 @@ def test_invalid_choice_is_rejected(monkeypatch):
     apply(monkeypatch, UNIFI_POLICY_KIND="banana")
     with pytest.raises(ConfigError, match="UNIFI_POLICY_KIND"):
         load_settings()
+
+
+def test_unreadable_tls_key_is_named_with_a_fix(monkeypatch, tmp_path):
+    """A key the service cannot read must not surface as a bare PermissionError.
+
+    os.access is stubbed rather than using real modes, because root bypasses
+    permission bits entirely and CI often runs as root. The production service
+    runs as the unprivileged unifi-toggle user, where the real check applies.
+    """
+    import os as os_module
+
+    cert, key = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert.write_text("x")
+    key.write_text("y")
+
+    real_access = os_module.access
+
+    def fake_access(path, mode, **kwargs):
+        if str(path) == str(key) and mode == os_module.R_OK:
+            return False
+        return real_access(path, mode, **kwargs)
+
+    monkeypatch.setattr("unifi_toggle.config.os.access", fake_access)
+    apply(monkeypatch, TLS_CERT_FILE=str(cert), TLS_KEY_FILE=str(key))
+    with pytest.raises(ConfigError) as excinfo:
+        load_settings()
+    message = str(excinfo.value)
+    assert "TLS_KEY_FILE" in message
+    assert "not readable" in message
+    assert "chmod 0640" in message
+    assert str(key) in message
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
+def test_unreadable_tls_key_with_real_permissions(monkeypatch, tmp_path):
+    """The same check, against real modes, when the suite is not run as root."""
+    cert, key = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert.write_text("x")
+    key.write_text("y")
+    os.chmod(key, 0o000)
+    apply(monkeypatch, TLS_CERT_FILE=str(cert), TLS_KEY_FILE=str(key))
+    try:
+        with pytest.raises(ConfigError, match="not readable"):
+            load_settings()
+    finally:
+        os.chmod(key, 0o600)
+
+
+def test_readable_tls_pair_is_accepted(monkeypatch, tmp_path):
+    cert, key = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert.write_text("x")
+    key.write_text("y")
+    apply(monkeypatch, TLS_CERT_FILE=str(cert), TLS_KEY_FILE=str(key))
+    assert load_settings().tls_enabled is True

@@ -174,8 +174,7 @@ if [ "$NEEDS_EDIT" = "1" ]; then
   echo
   echo "  2. Generate the TLS certificate, using this VM's LAN address:"
   echo "       sudo ${APP_DIR}/scripts/make-cert.sh <vm-ip> ${ETC_DIR}/tls"
-  echo "       sudo chown root:${APP_USER} ${ETC_DIR}/tls/*"
-  echo "       sudo chmod 0640 ${ETC_DIR}/tls/server.key ${ETC_DIR}/tls/ca.key"
+  echo "     Ownership and modes are set for you, there is nothing to chmod."
   echo
   echo "  3. Edit the env file. UNIFI_HOST and UNIFI_POLICY_NAME are already"
   echo "     filled in, so you only need API_TOKEN and UNIFI_API_KEY, plus the"
