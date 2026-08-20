@@ -3,8 +3,19 @@
     <color name="widget_background">#FFFFFFFF</color>
     <color name="widget_title">#FF1B1F24</color>
     <color name="widget_status">#FF5A6472</color>
-    <color name="button_enable">#FF1E7F4B</color>
-    <color name="button_disable">#FFB3261E</color>
+
+    <!-- Block means the policy is enabled, internet is blocked. Red. -->
+    <color name="block">#FFB3261E</color>
+    <!-- Allow means the policy is disabled, internet is allowed. Green. -->
+    <color name="allow">#FF1E7F4B</color>
     <color name="button_label">#FFFFFFFF</color>
+
+    <!-- Switch widget -->
+    <color name="switch_track_allowed">#FF1E7F4B</color>
+    <color name="switch_track_blocked">#FFB3261E</color>
+    <color name="switch_track_unknown">#FF5A6472</color>
+    <color name="switch_knob">#FFFFFFFF</color>
+    <color name="switch_label">#FFFFFFFF</color>
+
     <color name="launcher_background">#FF1B1F24</color>
 </resources>

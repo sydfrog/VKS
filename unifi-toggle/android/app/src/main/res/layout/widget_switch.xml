@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/switch_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/switch_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/widget_title"
+        android:textColor="@color/widget_title"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <!--
+      The tappable switch. Three full pills are stacked here and exactly one is
+      shown at a time, chosen at runtime with setViewVisibility. This uses only
+      RemoteViews methods that are always supported, no runtime repositioning.
+      A home screen widget cannot receive a drag, so the whole pill is a tap
+      target that flips to the other state.
+    -->
+    <FrameLayout
+        android:id="@+id/switch_track"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="4dp"
+        android:minHeight="48dp">
+
+        <!-- ALLOWED: green, knob to the left. Policy disabled. -->
+        <LinearLayout
+            android:id="@+id/state_allowed"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/switch_track_allowed"
+            android:gravity="center_vertical|start"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:contentDescription="@string/state_allowed"
+                android:src="@drawable/switch_knob" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/state_allowed"
+                android:textColor="@color/switch_label"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="34dp"
+                android:layout_height="1dp" />
+        </LinearLayout>
+
+        <!-- BLOCKED: red, knob to the right. Policy enabled. -->
+        <LinearLayout
+            android:id="@+id/state_blocked"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/switch_track_blocked"
+            android:gravity="center_vertical|end"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="34dp"
+                android:layout_height="1dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/state_blocked"
+                android:textColor="@color/switch_label"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:contentDescription="@string/state_blocked"
+                android:src="@drawable/switch_knob" />
+        </LinearLayout>
+
+        <!-- Unknown: gray, used for initial, checking and error states. -->
+        <LinearLayout
+            android:id="@+id/state_unknown"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/switch_track_unknown"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:visibility="visible">
+
+            <TextView
+                android:id="@+id/state_unknown_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="@string/state_checking"
+                android:textColor="@color/switch_label"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/switch_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="@string/hint_tap_to_switch"
+        android:textColor="@color/widget_status"
+        android:textSize="11sp" />
+</LinearLayout>

@@ -17,15 +17,30 @@
           There is no launcher activity on purpose. The app has no UI to browse.
           Find it in the widget picker under the name UniFi Toggle.
         -->
+        <!-- Two button style: Allow and Block. -->
         <receiver
             android:name=".ToggleWidgetProvider"
-            android:exported="false">
+            android:exported="false"
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- Switch style: one tap flips between Allowed and Blocked. -->
+        <receiver
+            android:name=".SwitchWidgetProvider"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/switch_widget_info" />
         </receiver>
 
     </application>

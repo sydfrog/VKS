@@ -3,7 +3,14 @@
     <color name="widget_background">#FF1B1F24</color>
     <color name="widget_title">#FFF2F4F7</color>
     <color name="widget_status">#FFA8B2BF</color>
-    <color name="button_enable">#FF2E9E63</color>
-    <color name="button_disable">#FFE0574A</color>
+
+    <color name="block">#FFE0574A</color>
+    <color name="allow">#FF2E9E63</color>
     <color name="button_label">#FFFFFFFF</color>
+
+    <color name="switch_track_allowed">#FF2E9E63</color>
+    <color name="switch_track_blocked">#FFE0574A</color>
+    <color name="switch_track_unknown">#FF6B7684</color>
+    <color name="switch_knob">#FFFFFFFF</color>
+    <color name="switch_label">#FFFFFFFF</color>
 </resources>

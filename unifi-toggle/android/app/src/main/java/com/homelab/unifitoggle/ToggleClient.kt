@@ -29,9 +29,10 @@ data class ToggleResult(
     fun statusLine(): String {
         val stamp = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         if (!ok) return "$stamp  $message"
+        // The policy blocks the kids' internet, so enabled means Blocked.
         return when (enabled) {
-            true -> "ON as of $stamp"
-            false -> "OFF as of $stamp"
+            true -> "Blocked as of $stamp"
+            false -> "Allowed as of $stamp"
             else -> "Unknown at $stamp"
         }
     }
@@ -53,6 +54,19 @@ object ToggleClient {
     fun enable(): ToggleResult = call("POST", "/enable", "Enable")
 
     fun disable(): ToggleResult = call("POST", "/disable", "Disable")
+
+    /**
+     * Flip the policy to the opposite of its current state.
+     *
+     * Reads the current state first, then calls the opposite. A home screen
+     * widget cannot capture a drag, so the switch widget turns a tap into this.
+     * Two requests rather than one, which is fine on a LAN for a single user.
+     */
+    fun toggle(): ToggleResult {
+        val current = status()
+        if (!current.ok || current.enabled == null) return current
+        return if (current.enabled) disable() else enable()
+    }
 
     private fun call(method: String, path: String, label: String): ToggleResult {
         val target = Config.BASE_URL.trimEnd('/') + path
@@ -107,12 +121,12 @@ object ToggleClient {
                 val name = json?.optString("name").orNullIfBlank()
                 val enabled = json?.optBoolean("enabled")
                 val changed = json?.optBoolean("changed") ?: false
-                val what = name ?: "Policy"
-                val state = if (enabled == true) "enabled" else "disabled"
+                // enabled means the block policy is on, so the kids are Blocked.
+                val state = if (enabled == true) "Blocked" else "Allowed"
                 val message = when {
-                    label == "Status" -> "$what is $state"
-                    changed -> "$what is now $state"
-                    else -> "$what was already $state"
+                    label == "Status" -> "Kids internet is $state"
+                    changed -> "Kids internet is now $state"
+                    else -> "Kids internet was already $state"
                 }
                 ToggleResult(ok = true, enabled = enabled, policyName = name, message = message)
             }

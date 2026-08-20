@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">UniFi Toggle</string>
-    <string name="widget_title">UniFi policy</string>
-    <string name="widget_description">Enable or disable one UniFi policy from the home screen.</string>
+    <string name="app_name">Kids Internet Access</string>
+    <string name="widget_title">Kids Internet Access</string>
+
+    <!-- Two button widget -->
+    <string name="widget_buttons_description">Two buttons, Allow and Block, for Kids Internet Access.</string>
     <string name="status_idle">Tap to refresh</string>
-    <string name="button_enable">Enable</string>
-    <string name="button_disable">Disable</string>
+    <string name="button_allow">Allow</string>
+    <string name="button_block">Block</string>
+
+    <!-- Switch widget -->
+    <string name="widget_switch_description">Tap to switch Kids Internet Access between Allowed and Blocked.</string>
+    <string name="state_allowed">ALLOWED</string>
+    <string name="state_blocked">BLOCKED</string>
+    <string name="state_checking">Checking...</string>
+    <string name="hint_tap_to_switch">Tap to switch</string>
 </resources>

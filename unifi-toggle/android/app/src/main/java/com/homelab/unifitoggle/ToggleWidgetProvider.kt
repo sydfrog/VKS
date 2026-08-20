@@ -99,11 +99,13 @@ class ToggleWidgetProvider : AppWidgetProvider() {
         fun buildViews(context: Context, status: String): RemoteViews =
             RemoteViews(context.packageName, R.layout.widget_toggle).apply {
                 setTextViewText(R.id.status_text, status)
+                // Block turns the policy on (kids lose internet), Allow turns
+                // it off (kids get internet).
                 setOnClickPendingIntent(
-                    R.id.button_enable, pendingIntent(context, ACTION_ENABLE, 1)
+                    R.id.button_block, pendingIntent(context, ACTION_ENABLE, 1)
                 )
                 setOnClickPendingIntent(
-                    R.id.button_disable, pendingIntent(context, ACTION_DISABLE, 2)
+                    R.id.button_allow, pendingIntent(context, ACTION_DISABLE, 2)
                 )
                 setOnClickPendingIntent(
                     R.id.status_text, pendingIntent(context, ACTION_REFRESH, 3)
