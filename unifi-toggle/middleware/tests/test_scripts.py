@@ -9,6 +9,7 @@ Ubuntu 22.04, in the one step the operator runs first.
 from __future__ import annotations
 
 import ast
+import os
 import re
 import shutil
 import subprocess
@@ -132,3 +133,69 @@ def test_unit_restarts_on_failure():
     text = UNIT_FILE.read_text()
     assert "Restart=on-failure" in text
     assert "WantedBy=multi-user.target" in text
+
+
+@pytest.mark.skipif(shutil.which("openssl") is None, reason="openssl not installed")
+def test_make_cert_reuses_ca_across_reissue(tmp_path):
+    """Reissuing the server cert must not change the CA.
+
+    A fresh CA on every run silently invalidates the certificate pinned in the
+    Android app, which showed up as a trust anchor error on every widget tap.
+    """
+    script = Path(__file__).resolve().parents[1] / "scripts" / "make-cert.sh"
+    out = tmp_path / "tls"
+
+    def ca_fingerprint() -> str:
+        result = subprocess.run(
+            ["openssl", "x509", "-in", str(out / "ca.crt"), "-noout",
+             "-fingerprint", "-sha256"],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout.strip()
+
+    def server_san() -> str:
+        result = subprocess.run(
+            ["openssl", "x509", "-in", str(out / "server.crt"), "-noout",
+             "-ext", "subjectAltName"],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout
+
+    subprocess.run(["bash", str(script), "192.168.0.5", str(out)],
+                   capture_output=True, text=True, check=True)
+    first_ca = ca_fingerprint()
+    assert "192.168.0.5" in server_san()
+
+    # Reissue for a different address in the same directory.
+    subprocess.run(["bash", str(script), "192.168.0.99", str(out)],
+                   capture_output=True, text=True, check=True)
+    assert ca_fingerprint() == first_ca, "reissuing the server cert changed the CA"
+    assert "192.168.0.99" in server_san(), "server SAN was not updated"
+
+    # The reissued server cert still chains to the unchanged CA.
+    verify = subprocess.run(
+        ["openssl", "verify", "-CAfile", str(out / "ca.crt"), str(out / "server.crt")],
+        capture_output=True, text=True,
+    )
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+
+
+@pytest.mark.skipif(shutil.which("openssl") is None, reason="openssl not installed")
+def test_make_cert_force_new_ca_rotates(tmp_path):
+    script = Path(__file__).resolve().parents[1] / "scripts" / "make-cert.sh"
+    out = tmp_path / "tls"
+
+    def ca_fingerprint() -> str:
+        return subprocess.run(
+            ["openssl", "x509", "-in", str(out / "ca.crt"), "-noout",
+             "-fingerprint", "-sha256"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+    subprocess.run(["bash", str(script), "192.168.0.5", str(out)],
+                   capture_output=True, text=True, check=True)
+    before = ca_fingerprint()
+    subprocess.run(["bash", str(script), "192.168.0.5", str(out)],
+                   capture_output=True, text=True, check=True,
+                   env={**os.environ, "FORCE_NEW_CA": "1"})
+    assert ca_fingerprint() != before, "FORCE_NEW_CA=1 did not rotate the CA"

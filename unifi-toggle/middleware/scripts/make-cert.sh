@@ -46,12 +46,27 @@ else
   SAN="DNS:${HOST}"
 fi
 
-echo "Generating CA"
-openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout ca.key -out ca.crt -days "$DAYS_CA" -sha256 \
-  -subj "/CN=unifi-toggle local CA" \
-  -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
-  -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
+# Reuse an existing CA rather than minting a new one on every run. A fresh CA
+# every time silently invalidates the certificate already pinned in the Android
+# app, so reissuing the server certificate, for example to correct the SAN,
+# would break the widget with a trust anchor error. Reusing the CA means the
+# app keeps trusting the VM across server certificate changes. Pass FORCE_NEW_CA=1
+# to deliberately rotate the CA, which then requires updating the app.
+if [ -f ca.key ] && [ -f ca.crt ] && [ "${FORCE_NEW_CA:-0}" != "1" ]; then
+  echo "Reusing the existing CA (ca.key and ca.crt are already here)"
+  echo "  set FORCE_NEW_CA=1 to rotate it, which means updating the Android app"
+else
+  if [ "${FORCE_NEW_CA:-0}" = "1" ]; then
+    echo "Generating a NEW CA because FORCE_NEW_CA=1. Update the app with the new ca.crt."
+  else
+    echo "Generating CA"
+  fi
+  openssl req -x509 -newkey rsa:2048 -nodes \
+    -keyout ca.key -out ca.crt -days "$DAYS_CA" -sha256 \
+    -subj "/CN=unifi-toggle local CA" \
+    -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
+fi
 
 echo "Generating server key and request for ${HOST} (SAN ${SAN})"
 openssl req -newkey rsa:2048 -nodes \

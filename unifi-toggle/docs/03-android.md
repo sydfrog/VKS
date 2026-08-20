@@ -161,6 +161,8 @@ should change from `Tap to refresh` to `ON as of 14:32` or `OFF as of 14:32`.
 
 * **Enable** turns the policy on. **Disable** turns it off.
 * A toast confirms each tap, for example `Block Kids from Internet is now enabled`.
+  If you have toasts turned off for this app, Android suppresses them, so the
+  same message also appears on the widget status line, which is never suppressed.
 * Tap the status line to re-read the state without changing anything.
 * Tapping Enable when it is already on says `Block Kids from Internet was already
   enabled` and changes nothing.
@@ -172,7 +174,8 @@ The toast tells you which layer failed.
 
 | Toast | Cause | Fix |
 | --- | --- | --- |
-| `TLS failed. Put the VM's ca.crt in res/raw/unifi_toggle_ca.pem and check BASE_URL matches the certificate.` | The CA was not replaced, or `BASE_URL` does not match the certificate SAN | Redo steps 4 and 5, rebuild, reinstall |
+| `TLS failed...` with `Trust anchor for certification path not found` in logcat | The CA in the app does not match the CA that signed the server cert, usually because make-cert.sh was rerun and minted a new CA | Copy the current `/etc/unifi-toggle/tls/ca.crt` from the VM into `res/raw/unifi_toggle_ca.pem`, rebuild, reinstall. Current make-cert.sh reuses the CA to avoid this. |
+| `TLS failed...` with a hostname or SAN error in logcat | `BASE_URL` does not match the certificate SAN | Make them match, rebuild, reinstall |
 | `Cannot reach https://...` | Phone is not on the network, VM is down, or the port is blocked | Check wifi or VPN, `systemctl status unifi-toggle`, and the VM firewall |
 | `Timed out. Is the VM awake and on the same network?` | The address answers slowly or not at all | Same checks as above |
 | `Rejected: no bearer token was sent` | `API_TOKEN` in `Config.kt` is empty | Fill it in, rebuild |
