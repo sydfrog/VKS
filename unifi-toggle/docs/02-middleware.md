@@ -168,43 +168,52 @@ This is the step to not skip.
 sudo /opt/unifi-toggle/scripts/smoke-test.sh
 ```
 
-It checks that an unauthenticated call is refused, that a wrong token is
-refused, and then runs status, enable, status, disable, status against your real
-console. Expected output:
+It checks that an unauthenticated call is refused and that a wrong token is
+refused, then reads the current state, flips the policy to the opposite state,
+and flips it back. Flipping away and back, rather than a fixed enable then
+disable, means it leaves the policy exactly as it found it. A fixed sequence
+would silently turn the policy off if it happened to be on when you ran the
+test.
+
+Expected tail, for a policy that starts enabled:
 
 ```
---- unauthenticated GET /status should be 401
-  HTTP 401
-
---- wrong token GET /status should be 403
-  HTTP 403
-
---- GET /healthz
-{"ok":true,"version":"1.0.0","checked_at":"..."}
+--- GET /status, reading the starting state
+  {...,"enabled":true,...}
   HTTP 200
 
---- GET /status (before)
-{"policy_id":"665f...","name":"Block Kids from Internet","enabled":false,...}
+  policy: Block Kids from Internet
+  id:     689b...
+  state:  true
+
+  This will disable it, then enable it again, leaving it true.
+
+--- POST /disable (should report changed true, this is a real write)
+  {...,"enabled":false,"changed":true,...}
   HTTP 200
 
---- POST /enable
-{...,"enabled":true,"changed":true,...}
+--- GET /status, independent read back
+  {...,"enabled":false,...}
+
+--- POST /disable again (should report changed false, no second write)
   HTTP 200
 
---- GET /status (should be enabled true)
-{...,"enabled":true,...}
+--- POST /enable (should report changed true, putting it back)
+  {...,"enabled":true,"changed":true,...}
   HTTP 200
 
---- POST /disable
-{...,"enabled":false,"changed":true,...}
-  HTTP 200
+--- GET /status, confirming it is back as found
+  {...,"enabled":true,...}
 
---- GET /status (should be enabled false)
-{...,"enabled":false,...}
-  HTTP 200
-
-Smoke test finished. Check that enabled flipped true then false above.
+==============================================================
+ PASS. Both directions performed real writes and were confirmed
+ by a separate read. The policy is back to enabled=true,
+ exactly as it was before this ran.
+==============================================================
 ```
+
+The script exits non-zero and prints PROBLEM lines if anything is off, so it is
+safe to wire into other checks.
 
 Now confirm it in the UniFi UI. Open the Network application, find your policy,
 and watch the enabled switch move while you run:
