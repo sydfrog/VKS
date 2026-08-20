@@ -64,10 +64,32 @@ else
   NEEDS_EDIT=0
 fi
 
-echo "Installing systemd unit"
-cp "${SRC}/systemd/unifi-toggle.service" "$UNIT"
-chmod 0644 "$UNIT"
-systemctl daemon-reload
+# Verify the install before touching systemd. A broken venv is much easier to
+# read about here than as a systemd start failure.
+echo "Checking the installed application"
+if ! "${APP_DIR}/venv/bin/python" -c "import unifi_toggle, fastapi, uvicorn, httpx" 2>/dev/null; then
+  echo "the virtualenv is not usable, the install did not complete" >&2
+  exit 1
+fi
+echo "  imports fine, version $("${APP_DIR}/venv/bin/python" -c 'import unifi_toggle; print(unifi_toggle.__version__)')"
+
+HAVE_SYSTEMD=0
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+  HAVE_SYSTEMD=1
+fi
+
+if [ "$HAVE_SYSTEMD" = "1" ]; then
+  echo "Installing systemd unit"
+  cp "${SRC}/systemd/unifi-toggle.service" "$UNIT"
+  chmod 0644 "$UNIT"
+  systemctl daemon-reload
+else
+  echo
+  echo "NOTE: systemd was not detected on this host, so the unit was not"
+  echo "      installed. Everything else is in place. This is expected inside"
+  echo "      a container. On a normal VM this step installs the service."
+  echo
+fi
 
 echo
 echo "Install complete."
@@ -83,14 +105,24 @@ if [ "$NEEDS_EDIT" = "1" ]; then
   echo "       sudo chown root:${APP_USER} ${ETC_DIR}/tls/*"
   echo "       sudo chmod 0640 ${ETC_DIR}/tls/server.key ${ETC_DIR}/tls/ca.key"
   echo
-  echo "  3. Edit the env file and fill in API_TOKEN, UNIFI_HOST,"
-  echo "     UNIFI_API_KEY and UNIFI_POLICY_ID:"
+  echo "  3. Edit the env file. UNIFI_HOST and UNIFI_POLICY_NAME are already"
+  echo "     filled in, so you only need API_TOKEN and UNIFI_API_KEY, plus the"
+  echo "     two TLS paths from step 2:"
   echo "       sudo nano ${ENV_FILE}"
   echo
   echo "  4. Then enable and start:"
 else
   echo "Then restart to pick up the new code:"
 fi
-echo "       sudo systemctl enable --now unifi-toggle"
-echo "       sudo systemctl status unifi-toggle"
-echo "       journalctl -u unifi-toggle -f"
+if [ "$HAVE_SYSTEMD" = "1" ]; then
+  echo "       sudo systemctl enable --now unifi-toggle"
+  echo "       sudo systemctl status unifi-toggle"
+  echo "       journalctl -u unifi-toggle -f"
+  echo
+  echo "  5. Then check it end to end:"
+  echo "       sudo ${APP_DIR}/scripts/smoke-test.sh"
+else
+  echo "       (no systemd here, so run it in the foreground instead)"
+  echo "       sudo -u ${APP_USER} env \$(grep -v \"^#\" ${ENV_FILE} | xargs) \\"
+  echo "         ${APP_DIR}/venv/bin/python -m unifi_toggle"
+fi
