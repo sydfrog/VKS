@@ -1,0 +1,160 @@
+"""Tests for environment parsing. Bad config must fail loudly at startup."""
+
+from __future__ import annotations
+
+import pytest
+
+from unifi_toggle.config import ConfigError, load_settings
+
+BASE_ENV = {
+    "API_TOKEN": "a-sufficiently-long-token",
+    "UNIFI_HOST": "192.168.1.1",
+    "UNIFI_API_KEY": "some-api-key",
+    "UNIFI_POLICY_ID": "665f1c2a9b1e4a0001abcdef",
+}
+
+
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch):
+    for name in (
+        "API_TOKEN", "BIND_HOST", "PORT", "TLS_CERT_FILE", "TLS_KEY_FILE",
+        "LOG_LEVEL", "UNIFI_HOST", "UNIFI_SITE", "UNIFI_CONTROLLER_TYPE",
+        "UNIFI_AUTH_MODE", "UNIFI_API_KEY", "UNIFI_USERNAME", "UNIFI_PASSWORD",
+        "UNIFI_VERIFY_SSL", "UNIFI_TIMEOUT", "UNIFI_POLICY_ID", "UNIFI_POLICY_KIND",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def apply(monkeypatch, **extra):
+    for key, value in {**BASE_ENV, **extra}.items():
+        if value is None:
+            monkeypatch.delenv(key, raising=False)
+        else:
+            monkeypatch.setenv(key, value)
+
+
+def test_defaults(monkeypatch):
+    apply(monkeypatch)
+    s = load_settings()
+    assert s.bind_host == "0.0.0.0"
+    assert s.port == 8080
+    assert s.unifi_base_url == "https://192.168.1.1"
+    assert s.unifi_site == "default"
+    assert s.network_prefix == "/proxy/network"
+    assert s.login_path == "/api/auth/login"
+    assert s.unifi_verify is False
+    assert s.tls_enabled is False
+
+
+def test_port_is_configurable(monkeypatch):
+    apply(monkeypatch, PORT="9443")
+    assert load_settings().port == 9443
+
+
+def test_bare_host_gets_https_scheme(monkeypatch):
+    apply(monkeypatch, UNIFI_HOST="unifi.lan")
+    assert load_settings().unifi_base_url == "https://unifi.lan"
+
+
+def test_explicit_scheme_and_port_are_preserved(monkeypatch):
+    apply(monkeypatch, UNIFI_HOST="https://unifi.lan:8443/")
+    assert load_settings().unifi_base_url == "https://unifi.lan:8443"
+
+
+def test_self_hosted_controller_drops_proxy_prefix(monkeypatch):
+    apply(monkeypatch, UNIFI_CONTROLLER_TYPE="network-server")
+    s = load_settings()
+    assert s.network_prefix == ""
+    assert s.login_path == "/api/login"
+
+
+def test_missing_token_is_rejected(monkeypatch):
+    apply(monkeypatch, API_TOKEN=None)
+    with pytest.raises(ConfigError, match="API_TOKEN"):
+        load_settings()
+
+
+def test_short_token_is_rejected(monkeypatch):
+    apply(monkeypatch, API_TOKEN="short")
+    with pytest.raises(ConfigError, match="at least 16"):
+        load_settings()
+
+
+def test_missing_policy_id_is_rejected(monkeypatch):
+    apply(monkeypatch, UNIFI_POLICY_ID=None)
+    with pytest.raises(ConfigError, match="UNIFI_POLICY_ID"):
+        load_settings()
+
+
+def test_no_credentials_at_all_is_rejected(monkeypatch):
+    apply(monkeypatch, UNIFI_API_KEY=None)
+    with pytest.raises(ConfigError, match="no UniFi credentials"):
+        load_settings()
+
+
+def test_apikey_mode_without_key_is_rejected(monkeypatch):
+    apply(monkeypatch, UNIFI_API_KEY=None, UNIFI_AUTH_MODE="apikey")
+    with pytest.raises(ConfigError, match="UNIFI_API_KEY is not set"):
+        load_settings()
+
+
+def test_login_mode_without_password_is_rejected(monkeypatch):
+    apply(monkeypatch, UNIFI_AUTH_MODE="login", UNIFI_USERNAME="svc")
+    with pytest.raises(ConfigError, match="UNIFI_PASSWORD"):
+        load_settings()
+
+
+def test_password_only_setup_warns_about_2fa(monkeypatch):
+    apply(monkeypatch, UNIFI_API_KEY=None, UNIFI_USERNAME="svc", UNIFI_PASSWORD="pw")
+    s = load_settings()
+    assert any("2FA" in w for w in s.warnings)
+
+
+def test_api_key_setup_does_not_warn(monkeypatch):
+    apply(monkeypatch)
+    assert load_settings().warnings == ()
+
+
+def test_half_configured_tls_is_rejected(monkeypatch, tmp_path):
+    cert = tmp_path / "cert.pem"
+    cert.write_text("x")
+    apply(monkeypatch, TLS_CERT_FILE=str(cert))
+    with pytest.raises(ConfigError, match="both TLS_CERT_FILE and TLS_KEY_FILE"):
+        load_settings()
+
+
+def test_tls_paths_must_exist(monkeypatch, tmp_path):
+    apply(
+        monkeypatch,
+        TLS_CERT_FILE=str(tmp_path / "missing.pem"),
+        TLS_KEY_FILE=str(tmp_path / "missing.key"),
+    )
+    with pytest.raises(ConfigError, match="not a file"):
+        load_settings()
+
+
+def test_tls_enables_when_both_present(monkeypatch, tmp_path):
+    cert, key = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert.write_text("x")
+    key.write_text("y")
+    apply(monkeypatch, TLS_CERT_FILE=str(cert), TLS_KEY_FILE=str(key))
+    assert load_settings().tls_enabled is True
+
+
+def test_verify_ssl_accepts_a_ca_bundle_path(monkeypatch, tmp_path):
+    bundle = tmp_path / "ca.pem"
+    bundle.write_text("x")
+    apply(monkeypatch, UNIFI_VERIFY_SSL=str(bundle))
+    assert load_settings().unifi_verify == str(bundle)
+
+
+def test_verify_ssl_rejects_a_missing_bundle(monkeypatch, tmp_path):
+    apply(monkeypatch, UNIFI_VERIFY_SSL=str(tmp_path / "nope.pem"))
+    with pytest.raises(ConfigError, match="not a file"):
+        load_settings()
+
+
+def test_invalid_choice_is_rejected(monkeypatch):
+    apply(monkeypatch, UNIFI_POLICY_KIND="banana")
+    with pytest.raises(ConfigError, match="UNIFI_POLICY_KIND"):
+        load_settings()

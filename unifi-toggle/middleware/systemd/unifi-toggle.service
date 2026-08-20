@@ -1,0 +1,43 @@
+[Unit]
+Description=UniFi policy toggle middleware
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unifi-toggle
+Group=unifi-toggle
+
+# Every secret lives here, mode 0600, owned by root. Nothing is on the
+# command line, so credentials never show up in ps output.
+EnvironmentFile=/etc/unifi-toggle/unifi-toggle.env
+
+WorkingDirectory=/opt/unifi-toggle
+ExecStart=/opt/unifi-toggle/venv/bin/python -m unifi_toggle
+
+# Restart on failure, and keep trying rather than giving up after 5 attempts.
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=0
+
+# Logs go to the journal. Read them with: journalctl -u unifi-toggle -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=unifi-toggle
+
+# Hardening. The service only needs to read its own files and open sockets.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+# Generated keys and certificates. Never commit these.
+tls/
+*.crt
+*.srl
+
+# The placeholder CA that ships with the Android project is not a secret and is
+# needed for the project to build. The repository root ignores *.pem, so this
+# negation puts that one file back.
+!android/app/src/main/res/raw/unifi_toggle_ca.pem
+
+# Local virtualenvs and build output
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+
+# A filled in env file holds the API key and the bearer token.
+unifi-toggle.env
+!unifi-toggle.env.example

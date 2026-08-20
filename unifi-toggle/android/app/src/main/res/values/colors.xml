@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background">#FFFFFFFF</color>
+    <color name="widget_title">#FF1B1F24</color>
+    <color name="widget_status">#FF5A6472</color>
+    <color name="button_enable">#FF1E7F4B</color>
+    <color name="button_disable">#FFB3261E</color>
+    <color name="button_label">#FFFFFFFF</color>
+    <color name="launcher_background">#FF1B1F24</color>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UniFi Toggle</string>
+    <string name="widget_title">UniFi policy</string>
+    <string name="widget_description">Enable or disable one UniFi policy from the home screen.</string>
+    <string name="status_idle">Tap to refresh</string>
+    <string name="button_enable">Enable</string>
+    <string name="button_disable">Disable</string>
+</resources>
