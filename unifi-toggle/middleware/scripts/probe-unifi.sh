@@ -60,10 +60,14 @@ if not isinstance(items, list) or not items:
 for item in items:
     if not isinstance(item, dict):
         continue
+    pid = item.get("_id") or item.get("id") or "?"
     name = item.get("name") or item.get("description") or "(unnamed)"
     flag = "enabled " if item.get("enabled") else "disabled"
     tag = "  [predefined, cannot be toggled]" if item.get("predefined") else ""
-    print(f"    {item.get(\"_id\",\"?\")}  {flag}  {name}{tag}")
+    # Percent formatting, not an f-string: an f-string expression cannot
+    # contain a backslash before Python 3.12, and this runs inside single
+    # quoted shell so the inner quotes would have to be escaped.
+    print("    %s  %s  %s%s" % (pid, flag, name, tag))
 '
 }
 

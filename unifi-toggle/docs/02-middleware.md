@@ -264,6 +264,23 @@ journalctl -u unifi-toggle -n 100 --no-pager   # last 100 lines
 The unit restarts on failure after 5 seconds, with no give up limit, so a
 console reboot or a network blip recovers on its own.
 
+## Getting a second opinion
+
+To have someone else look at a problem, run:
+
+```bash
+sudo /opt/unifi-toggle/scripts/report.sh
+```
+
+It prints the host details, your configuration, the TLS certificate's Subject
+Alternative Name, the systemd state, live `/healthz` and `/status` responses,
+every policy the console can see, and the last 30 log lines.
+
+`API_TOKEN`, `UNIFI_API_KEY` and `UNIFI_PASSWORD` are masked to their first four
+characters and a length. Policy names, policy IDs and site names are printed in
+full, because they are not secrets. The whole block is safe to paste into a chat
+or an issue.
+
 ## When something is wrong
 
 Read the error and hint from `/status` first:

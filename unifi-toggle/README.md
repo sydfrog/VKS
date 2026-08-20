@@ -56,8 +56,9 @@ middleware/
     make-cert.sh         makes the CA and server certificate
     probe-unifi.sh       lists every policy ID on the console
     smoke-test.sh        exercises a running service
+    report.sh            pasteable diagnostic report, secrets masked
     local-e2e.sh         full test with a fake console, no UniFi needed
-  tests/                 pytest suite, 65 tests
+  tests/                 pytest suite, 87 tests
   unifi-toggle.env.example
 
 android/
