@@ -22,7 +22,7 @@ object Config {
     const val BASE_URL: String = "https://192.168.0.5:8080"
 
     /** Value of API_TOKEN from /etc/unifi-toggle/unifi-toggle.env on the VM. */
-    const val API_TOKEN: String = "paste-the-API_TOKEN-value-here"
+    const val API_TOKEN: String = "dQM64nAh7ptVomiZhwW4XWt5BD24KzlVvEhHxUfqx58"
 
     /** Milliseconds to wait for the TCP and TLS handshake. */
     const val CONNECT_TIMEOUT_MS: Int = 5_000
