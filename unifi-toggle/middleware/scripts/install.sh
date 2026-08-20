@@ -23,6 +23,52 @@ fi
 
 echo "Source directory: ${SRC}"
 
+die() { echo; echo "ERROR: $*" >&2; exit 1; }
+
+# Debian and Ubuntu ship venv and ensurepip in a separate package, so name it.
+print_venv_hint() {
+  local id like
+  id="$(. /etc/os-release 2>/dev/null && echo "${ID:-}")"
+  like="$(. /etc/os-release 2>/dev/null && echo "${ID_LIKE:-}")"
+  echo
+  case "${id} ${like}" in
+    *debian*|*ubuntu*)
+      echo "    sudo apt update"
+      echo "    sudo apt install -y python3-venv python3-pip"
+      ;;
+    *fedora*|*rhel*|*centos*)
+      echo "    sudo dnf install -y python3-pip"
+      ;;
+    *)
+      echo "    install your distribution's python3 venv and pip packages"
+      ;;
+  esac
+  echo
+}
+
+# Fail before creating users or directories, so a missing package leaves
+# nothing half built behind.
+echo "Checking prerequisites"
+command -v python3 >/dev/null 2>&1 || die "python3 is not installed."
+
+PY_VER="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+if [ "$(python3 -c 'import sys; print(1 if sys.version_info[:2] >= (3, 10) else 0)')" != "1" ]; then
+  die "python3 is ${PY_VER}, and this needs 3.10 or newer."
+fi
+if [ "$(python3 -c 'import sys; print(1 if sys.version_info[:2] >= (3, 11) else 0)')" != "1" ]; then
+  echo "  note: python3 is ${PY_VER}. That works, but 3.11 is what this was tested on."
+fi
+
+if ! python3 -c 'import venv, ensurepip' >/dev/null 2>&1; then
+  echo
+  echo "python3 ${PY_VER} cannot build a virtualenv, because the venv or"
+  echo "ensurepip module is missing. On Debian and Ubuntu these are packaged"
+  echo "separately from python3 itself. Install them with:"
+  print_venv_hint
+  die "missing python3 venv support."
+fi
+echo "  python3 ${PY_VER}, venv support present"
+
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
   echo "Creating system user ${APP_USER}"
   useradd --system --no-create-home --shell /usr/sbin/nologin "$APP_USER"
@@ -39,10 +85,36 @@ install -d -o root -g root -m 0755 "${APP_DIR}/scripts"
 cp "${SRC}"/scripts/*.sh "${APP_DIR}/scripts/"
 chmod 0755 "${APP_DIR}"/scripts/*.sh
 
-if [ ! -x "${APP_DIR}/venv/bin/python" ]; then
+# A failed "python3 -m venv" still leaves bin/python behind, and only fails
+# later at ensurepip. Testing bin/python alone therefore treats a broken venv
+# as a good one, so require pip as well and rebuild when it is missing.
+venv_is_usable() {
+  [ -x "${APP_DIR}/venv/bin/python" ] && [ -x "${APP_DIR}/venv/bin/pip" ]
+}
+
+if venv_is_usable; then
+  echo "Reusing the existing virtualenv"
+else
+  if [ -e "${APP_DIR}/venv" ]; then
+    echo "The existing virtualenv is incomplete, rebuilding it"
+    rm -rf "${APP_DIR}/venv"
+  fi
   echo "Creating virtualenv"
-  python3 -m venv "${APP_DIR}/venv"
+  if ! python3 -m venv "${APP_DIR}/venv"; then
+    echo
+    echo "Creating the virtualenv failed. The usual cause is a missing package:"
+    print_venv_hint
+    die "could not create the virtualenv."
+  fi
+  if ! venv_is_usable; then
+    echo
+    echo "The virtualenv was created but has no pip in it. Install the package"
+    echo "shown below and re-run this script:"
+    print_venv_hint
+    die "virtualenv has no pip."
+  fi
 fi
+
 echo "Installing Python dependencies"
 "${APP_DIR}/venv/bin/pip" install --quiet --upgrade pip
 "${APP_DIR}/venv/bin/pip" install --quiet -r "${APP_DIR}/requirements.txt"

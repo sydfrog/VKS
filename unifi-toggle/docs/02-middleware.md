@@ -20,8 +20,14 @@ file, and in the Android app. This guide calls it `<vm-ip>`.
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv openssl curl git
+sudo apt install -y python3 python3-venv python3-pip openssl curl git
 ```
+
+`python3-venv` matters more than it looks. Debian and Ubuntu ship `venv` and
+`ensurepip` in a package separate from `python3` itself, and without it
+`python3 -m venv` half succeeds: it creates the directory and `bin/python`, then
+fails before installing pip. `install.sh` checks for this up front and refuses
+to start rather than leaving a broken virtualenv behind.
 
 ## 2. Get the code and install the service
 
@@ -292,6 +298,7 @@ curl -sk -H "Authorization: Bearer $TOKEN" https://127.0.0.1:8080/status
 
 | What you see | What it means |
 | --- | --- |
+| `venv/bin/pip: No such file or directory` during install | An earlier run left a half built virtualenv. Re-run `sudo scripts/install.sh`, which now detects and rebuilds it. Install `python3-venv` first. |
 | `configuration error: ...` and the service will not start | A required variable is missing or malformed. The message names it. |
 | HTTP 401 | No bearer token was sent. |
 | HTTP 403 | The token does not match `API_TOKEN`. |
