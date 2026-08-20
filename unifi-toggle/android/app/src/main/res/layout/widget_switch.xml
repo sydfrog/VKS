@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="10dp">
 
     <TextView
         android:id="@+id/switch_title"
@@ -32,7 +32,7 @@
         android:layout_weight="1"
         android:layout_marginTop="6dp"
         android:layout_marginBottom="4dp"
-        android:minHeight="48dp">
+        android:minHeight="56dp">
 
         <!-- ALLOWED: green, knob to the left. Policy disabled. -->
         <LinearLayout
