@@ -199,3 +199,52 @@ def test_make_cert_force_new_ca_rotates(tmp_path):
                    capture_output=True, text=True, check=True,
                    env={**os.environ, "FORCE_NEW_CA": "1"})
     assert ca_fingerprint() != before, "FORCE_NEW_CA=1 did not rotate the CA"
+
+
+# App widgets may only use a fixed set of view classes. A bare <View> or other
+# unsupported tag makes Android fail to inflate the widget with "Couldn't add
+# widget", which cannot be caught by an XML well-formedness check. This guard
+# scans the widget layouts for anything outside the allowed set.
+ANDROID_RES = (
+    Path(__file__).resolve().parents[2]
+    / "android" / "app" / "src" / "main" / "res"
+)
+
+# The classic RemoteViews-supported classes, which are safe on every supported
+# Android version. Deliberately conservative.
+ALLOWED_WIDGET_VIEWS = {
+    "FrameLayout", "LinearLayout", "RelativeLayout", "GridLayout",
+    "AnalogClock", "Button", "Chronometer", "ImageButton", "ImageView",
+    "ProgressBar", "TextView", "ViewFlipper", "ListView", "GridView",
+    "StackView", "AdapterViewFlipper",
+}
+
+
+def _widget_layout_files() -> list[Path]:
+    xml_dir = ANDROID_RES / "xml"
+    layout_dir = ANDROID_RES / "layout"
+    if not xml_dir.is_dir():
+        return []
+    layouts: set[Path] = set()
+    for info in xml_dir.glob("*widget_info.xml"):
+        m = re.search(r'initialLayout="@layout/(\w+)"', info.read_text())
+        if m:
+            layouts.add(layout_dir / f"{m.group(1)}.xml")
+    return sorted(p for p in layouts if p.is_file())
+
+
+@pytest.mark.skipif(not ANDROID_RES.is_dir(), reason="android resources not present")
+def test_widget_layouts_use_only_supported_views():
+    import xml.etree.ElementTree as ET
+
+    files = _widget_layout_files()
+    assert files, "no widget layouts discovered from *widget_info.xml"
+    problems: list[str] = []
+    for f in files:
+        root = ET.parse(f).getroot()
+        for el in root.iter():
+            tag = el.tag.rsplit("}", 1)[-1] if "}" in el.tag else el.tag
+            # Fully qualified custom views contain a dot; none are allowed here.
+            if tag not in ALLOWED_WIDGET_VIEWS:
+                problems.append(f"{f.name}: <{tag}> is not an app-widget-safe view")
+    assert not problems, "unsupported views in widget layouts:\n" + "\n".join(problems)
