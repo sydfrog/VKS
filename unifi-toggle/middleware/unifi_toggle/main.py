@@ -80,19 +80,20 @@ def create_app(
         # Serialises read-modify-write so two taps cannot interleave.
         app.state.write_lock = asyncio.Lock()
         log.info(
-            "unifi-toggle %s ready. console=%s site=%s auth=%s policy=%s kind=%s",
+            "unifi-toggle %s ready. console=%s site=%s auth=%s target=%s kind=%s",
             __version__,
             resolved.unifi_base_url,
             resolved.unifi_site,
             app.state.unifi.auth_mode,
-            resolved.policy_id,
+            resolved.policy_descriptor,
             resolved.policy_kind,
         )
         try:
             state = await app.state.unifi.get_state()
             log.info(
-                "startup probe found policy %r (%s) currently %s",
+                "startup probe found policy %r id %s (%s) currently %s",
                 state.name,
+                state.policy_id,
                 state.kind,
                 "enabled" if state.enabled else "disabled",
             )

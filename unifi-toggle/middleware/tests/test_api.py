@@ -84,7 +84,7 @@ def test_status_reports_current_state(api):
     client, _ = api
     body = client.get("/status", headers=auth()).json()
     assert body["enabled"] is False
-    assert body["name"] == "Block Kids Internet"
+    assert body["name"] == "Block Kids from Internet"
     assert body["kind"] == "firewall-policy"
     assert body["site"] == "default"
     assert body["checked_at"]

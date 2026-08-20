@@ -9,12 +9,14 @@ from tests.conftest import make_settings
 from tests.fake_unifi import (
     API_KEY,
     FIREWALL_RULE_ID,
+    POLICY_ID,
     PASSWORD,
     PREDEFINED_ID,
     TRAFFIC_RULE_ID,
     USERNAME,
 )
 from unifi_toggle.unifi import (
+    AmbiguousPolicy,
     AuthError,
     ConnectivityError,
     PolicyNotFound,
@@ -29,7 +31,7 @@ async def test_reads_current_state(fake_console):
     http, _state = fake_console
     client = UniFiClient(make_settings(), http)
     state = await client.get_state()
-    assert state.name == "Block Kids Internet"
+    assert state.name == "Block Kids from Internet"
     assert state.enabled is False
     assert state.kind == "firewall-policy"
 
@@ -190,3 +192,76 @@ async def test_redirect_to_login_is_reported_as_an_auth_problem(fake_console):
         await client.get_state()
     assert "redirected" in str(excinfo.value)
     await redirecting.aclose()
+
+
+async def test_finds_policy_by_name(fake_console):
+    """The name shown in the UniFi UI is enough, no ID needed."""
+    http, _st = fake_console
+    client = UniFiClient(
+        make_settings(policy_id=None, policy_name="Block Kids from Internet"), http
+    )
+    state = await client.get_state()
+    assert state.policy_id == POLICY_ID
+    assert state.kind == "firewall-policy"
+
+
+async def test_name_match_ignores_case_and_surrounding_space(fake_console):
+    http, _st = fake_console
+    client = UniFiClient(
+        make_settings(policy_id=None, policy_name="  block kids FROM internet  "), http
+    )
+    assert (await client.get_state()).policy_id == POLICY_ID
+
+
+async def test_toggle_by_name_round_trip(fake_console):
+    http, st = fake_console
+    client = UniFiClient(
+        make_settings(policy_id=None, policy_name="Block Kids from Internet"), http
+    )
+    state, changed = await client.set_enabled(True)
+    assert state.enabled is True
+    assert changed is True
+    assert st.policies[POLICY_ID]["enabled"] is True
+
+
+async def test_name_matches_a_traffic_rule_description(fake_console):
+    """Traffic rules carry the display name in "description", not "name"."""
+    http, _st = fake_console
+    client = UniFiClient(make_settings(policy_id=None, policy_name="Pause Console"), http)
+    state = await client.get_state()
+    assert state.kind == "traffic-rule"
+
+
+async def test_duplicate_names_refuse_to_guess(fake_console):
+    """Two rules with the same name must be an error, never a coin flip."""
+    http, st = fake_console
+    twin = dict(st.policies[POLICY_ID])
+    twin["_id"] = "665f1c2a9b1e4a0001cccccc"
+    st.policies[twin["_id"]] = twin
+    client = UniFiClient(
+        make_settings(policy_id=None, policy_name="Block Kids from Internet"), http
+    )
+    with pytest.raises(AmbiguousPolicy) as excinfo:
+        await client.get_state()
+    assert excinfo.value.status == 409
+    assert POLICY_ID in str(excinfo.value)
+    assert "UNIFI_POLICY_ID" in (excinfo.value.hint or "")
+
+
+async def test_unknown_name_reports_the_name_not_a_bare_id(fake_console):
+    http, _st = fake_console
+    client = UniFiClient(make_settings(policy_id=None, policy_name="No Such Rule"), http)
+    with pytest.raises(PolicyNotFound) as excinfo:
+        await client.get_state()
+    assert 'policy named "No Such Rule"' in str(excinfo.value)
+
+
+async def test_id_wins_when_both_id_and_name_are_set(fake_console):
+    """A stale name must not override an explicit ID."""
+    http, _st = fake_console
+    client = UniFiClient(
+        make_settings(policy_id=POLICY_ID, policy_name="Pause Console"), http
+    )
+    state = await client.get_state()
+    assert state.policy_id == POLICY_ID
+    assert state.kind == "firewall-policy"

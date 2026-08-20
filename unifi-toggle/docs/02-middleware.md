@@ -5,7 +5,8 @@ Fedora or RHEL swap `apt` for `dnf` and the package names are the same.
 
 ## What you need first
 
-* The API key and policy ID from [part 1a](01-unifi-setup.md)
+* The API key from [part 1a](01-unifi-setup.md), and either the policy name or
+  its ID
 * The VM's LAN address, the one the phone will reach. Find it with:
 
 ```bash
@@ -66,7 +67,7 @@ signed certificate is not enough. That is the only reason there are two.
 
 The address you pass goes into the certificate's Subject Alternative Name.
 Android ignores the Common Name entirely and checks only the SAN, so this has to
-match what you put in `Config.kt` exactly. `https://192.168.1.50:8080` and
+match what you put in `Config.kt` exactly. `https://192.168.0.50:8080` and
 `https://myvm.local:8080` are not interchangeable.
 
 You will copy `/etc/unifi-toggle/tls/ca.crt` to your workstation in part 3.
@@ -78,16 +79,27 @@ You will copy `/etc/unifi-toggle/tls/ca.crt` to your workstation in part 3.
 sudo nano /etc/unifi-toggle/unifi-toggle.env
 ```
 
-Set these five, leave the rest at their defaults:
+Set these, leave the rest at their defaults:
 
 ```
 API_TOKEN=<the token from step 3>
-UNIFI_HOST=<your-udm-pro-ip>
+UNIFI_HOST=192.168.0.1
 UNIFI_API_KEY=<the API key from part 1a>
-UNIFI_POLICY_ID=<the policy ID from part 1a>
+UNIFI_POLICY_NAME="Block Kids from Internet"
 TLS_CERT_FILE=/etc/unifi-toggle/tls/server-fullchain.pem
 TLS_KEY_FILE=/etc/unifi-toggle/tls/server.key
 ```
+
+`UNIFI_HOST` is already set to `192.168.0.1` in the shipped example, which is
+your UCG Ultra, so you can leave that line alone.
+
+The policy name has to be in double quotes because it contains spaces. Both
+systemd and the helper scripts strip the quotes. Case and surrounding spaces do
+not matter, so `"block kids from internet"` works too.
+
+If you got the ID in part 1a, set `UNIFI_POLICY_ID=<the id>` instead. When both
+are set the ID wins and the name is ignored, and the service logs a warning
+saying so.
 
 `PORT` defaults to 8080 and `BIND_HOST` to 0.0.0.0, which is what you asked for.
 Change `PORT` here if 8080 is taken.
@@ -127,10 +139,14 @@ journalctl -u unifi-toggle -n 20 --no-pager
 ```
 
 ```
-unifi-toggle 1.0.0 ready. console=https://192.168.1.1 site=default auth=apikey policy=665f... kind=auto
-resolved policy 665f1c2a9b1e4a0001abcdef as kind firewall-policy
-startup probe found policy 'Block Kids Internet' (firewall-policy) currently disabled
+unifi-toggle 1.0.0 ready. console=https://192.168.0.1 site=default auth=apikey target=policy named "Block Kids from Internet" kind=auto
+resolved policy named "Block Kids from Internet" as kind firewall-policy, id 665f1c2a9b1e4a0001abcdef
+startup probe found policy 'Block Kids from Internet' id 665f1c2a9b1e4a0001abcdef (firewall-policy) currently disabled
 ```
+
+That middle line is worth keeping. It is the policy ID, resolved from the name.
+If you would rather pin the ID than the name, paste it into `UNIFI_POLICY_ID`,
+clear `UNIFI_POLICY_NAME`, and restart.
 
 If the probe fails the service still starts, on purpose. A restart loop would
 just hide the error. The failure is reported on `GET /status` instead.
@@ -159,7 +175,7 @@ console. Expected output:
   HTTP 200
 
 --- GET /status (before)
-{"policy_id":"665f...","name":"Block Kids Internet","enabled":false,...}
+{"policy_id":"665f...","name":"Block Kids from Internet","enabled":false,...}
   HTTP 200
 
 --- POST /enable
@@ -262,11 +278,12 @@ curl -sk -H "Authorization: Bearer $TOKEN" https://127.0.0.1:8080/status
 | `configuration error: ...` and the service will not start | A required variable is missing or malformed. The message names it. |
 | HTTP 401 | No bearer token was sent. |
 | HTTP 403 | The token does not match `API_TOKEN`. |
-| HTTP 404, "policy not found" | Wrong `UNIFI_POLICY_ID`, or the right ID on a different site. Re-run `probe-unifi.sh`. |
+| HTTP 404, "policy not found" | Wrong `UNIFI_POLICY_ID` or `UNIFI_POLICY_NAME`, or the right one on a different site. Re-run `probe-unifi.sh`. |
+| HTTP 409, "policies are named" | Two policies share that name. Set `UNIFI_POLICY_ID` to the one you want and clear `UNIFI_POLICY_NAME`. |
 | HTTP 409, "predefined" | You pointed it at a built in policy. Pick one you created. |
 | HTTP 502, "UniFi denied" | The API key was refused. Re-check it in Control Plane, Integrations. |
 | HTTP 502, "demanded a 2FA code" | It fell back to username and password login. Set `UNIFI_API_KEY` and clear `UNIFI_USERNAME` and `UNIFI_PASSWORD`. |
-| HTTP 502, "cannot reach UniFi console" | Wrong `UNIFI_HOST`, or the VM cannot route to the UDM Pro. |
+| HTTP 502, "cannot reach UniFi console" | Wrong `UNIFI_HOST`, or the VM cannot route to the UCG Ultra. |
 
 Auth failures and connectivity failures are reported as themselves, never as
 "policy not found". If you see a 404 it really is the policy ID.

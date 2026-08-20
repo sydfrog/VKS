@@ -1,6 +1,6 @@
 """A stand-in UniFi OS console used by the test suite and the local smoke test.
 
-It speaks the same shapes as a real UDM Pro running Network 9.x:
+It speaks the same shapes as a real UCG Ultra running Network 9.x:
   POST /api/auth/login                                       cookie login plus CSRF
   GET  /proxy/network/v2/api/site/{site}/firewall-policies   zone based policies
   PUT  /proxy/network/v2/api/site/{site}/firewall-policies/{id}
@@ -64,7 +64,7 @@ class FakeState:
         self.policies = {
             POLICY_ID: {
                 "_id": POLICY_ID,
-                "name": "Block Kids Internet",
+                "name": "Block Kids from Internet",
                 "enabled": False,
                 "action": "BLOCK",
                 "predefined": False,

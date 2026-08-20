@@ -7,15 +7,16 @@ Built for the gear you described:
 
 | Item | Value |
 | --- | --- |
-| Gateway | UDM Pro, running UniFi OS |
+| Gateway | UCG Ultra at 192.168.0.1, running UniFi OS |
 | UniFi Network | 9.0 or newer |
 | Phone to VM transport | HTTPS with a self signed certificate |
+| Policy toggled | `Block Kids from Internet` |
 | Ubiquiti account | 2FA is on, so the service authenticates with an API key |
 
 ## How it fits together
 
 ```
-  Phone widget                 Linux VM                      UDM Pro
+  Phone widget                 Linux VM                      UCG Ultra
   ------------                 --------                      -------
   [Enable] [Disable]  HTTPS    unifi-toggle service   HTTPS   UniFi Network
   bearer token        ----->   FastAPI on uvicorn     ----->  firewall policy
@@ -56,7 +57,7 @@ middleware/
     probe-unifi.sh       lists every policy ID on the console
     smoke-test.sh        exercises a running service
     local-e2e.sh         full test with a fake console, no UniFi needed
-  tests/                 pytest suite, 55 tests
+  tests/                 pytest suite, 65 tests
   unifi-toggle.env.example
 
 android/
@@ -84,7 +85,7 @@ All three policy endpoints return the same JSON shape:
 ```json
 {
   "policy_id": "665f1c2a9b1e4a0001abcdef",
-  "name": "Block Kids Internet",
+  "name": "Block Kids from Internet",
   "enabled": true,
   "kind": "firewall-policy",
   "site": "default",
@@ -95,6 +96,22 @@ All three policy endpoints return the same JSON shape:
 
 `changed` is false when the policy was already in the state you asked for, so
 tapping Enable twice is safe and tells you the truth.
+
+## Which policy it toggles
+
+Set one of these in the env file on the VM:
+
+* `UNIFI_POLICY_NAME="Block Kids from Internet"`, the name as it reads in the
+  UniFi UI. Case and surrounding spaces are ignored. Quickest to set up.
+* `UNIFI_POLICY_ID=665f...`, which survives renaming the policy in the UI.
+
+The ID wins if both are set. If two policies share a name the service returns
+409 and names both IDs rather than picking one, because guessing which rule
+controls your kids' internet is not a thing it should do.
+
+The service works with zone based firewall policies, traffic rules and legacy
+firewall rules, and probes all three to find yours. On Network 9.x a rule like
+this one is a firewall policy.
 
 Failures return `{"error": "...", "hint": "..."}` with a real status code:
 401 no token, 403 wrong token, 404 policy ID not on the console, 409 the policy

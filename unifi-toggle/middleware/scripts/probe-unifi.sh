@@ -4,7 +4,7 @@
 # console, with the ID you need for UNIFI_POLICY_ID.
 #
 # Usage:
-#   UNIFI_HOST=192.168.1.1 UNIFI_API_KEY=xxxx scripts/probe-unifi.sh
+#   UNIFI_HOST=192.168.0.1 UNIFI_API_KEY=xxxx scripts/probe-unifi.sh
 #   scripts/probe-unifi.sh /etc/unifi-toggle/unifi-toggle.env
 #
 # Reads the env file if you pass one, otherwise uses the current environment.
@@ -15,7 +15,7 @@ if [ $# -ge 1 ]; then
   set -a; . "$1"; set +a
 fi
 
-: "${UNIFI_HOST:?set UNIFI_HOST, for example 192.168.1.1}"
+: "${UNIFI_HOST:?set UNIFI_HOST, for example 192.168.0.1}"
 : "${UNIFI_API_KEY:?set UNIFI_API_KEY, create one at Control Plane > Integrations}"
 SITE="${UNIFI_SITE:-default}"
 TYPE="${UNIFI_CONTROLLER_TYPE:-unifi-os}"
@@ -72,4 +72,5 @@ show "Firewall policies (Network 9.x zone based)" "${BASE}${PREFIX}/v2/api/site/
 show "Traffic rules"                              "${BASE}${PREFIX}/v2/api/site/${SITE}/trafficrules"
 show "Legacy firewall rules"                      "${BASE}${PREFIX}/api/s/${SITE}/rest/firewallrule"
 echo
-echo "Copy the ID of the policy you want into UNIFI_POLICY_ID."
+echo "Set UNIFI_POLICY_ID to the ID of the policy you want, or skip the ID and"
+echo "set UNIFI_POLICY_NAME to its name exactly as shown above."

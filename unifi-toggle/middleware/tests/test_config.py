@@ -8,7 +8,7 @@ from unifi_toggle.config import ConfigError, load_settings
 
 BASE_ENV = {
     "API_TOKEN": "a-sufficiently-long-token",
-    "UNIFI_HOST": "192.168.1.1",
+    "UNIFI_HOST": "192.168.0.1",
     "UNIFI_API_KEY": "some-api-key",
     "UNIFI_POLICY_ID": "665f1c2a9b1e4a0001abcdef",
 }
@@ -21,6 +21,7 @@ def clean_env(monkeypatch):
         "LOG_LEVEL", "UNIFI_HOST", "UNIFI_SITE", "UNIFI_CONTROLLER_TYPE",
         "UNIFI_AUTH_MODE", "UNIFI_API_KEY", "UNIFI_USERNAME", "UNIFI_PASSWORD",
         "UNIFI_VERIFY_SSL", "UNIFI_TIMEOUT", "UNIFI_POLICY_ID", "UNIFI_POLICY_KIND",
+        "UNIFI_POLICY_NAME",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -38,7 +39,7 @@ def test_defaults(monkeypatch):
     s = load_settings()
     assert s.bind_host == "0.0.0.0"
     assert s.port == 8080
-    assert s.unifi_base_url == "https://192.168.1.1"
+    assert s.unifi_base_url == "https://192.168.0.1"
     assert s.unifi_site == "default"
     assert s.network_prefix == "/proxy/network"
     assert s.login_path == "/api/auth/login"
@@ -80,10 +81,31 @@ def test_short_token_is_rejected(monkeypatch):
         load_settings()
 
 
-def test_missing_policy_id_is_rejected(monkeypatch):
+def test_missing_both_policy_selectors_is_rejected(monkeypatch):
     apply(monkeypatch, UNIFI_POLICY_ID=None)
-    with pytest.raises(ConfigError, match="UNIFI_POLICY_ID"):
+    with pytest.raises(ConfigError, match="UNIFI_POLICY_NAME"):
         load_settings()
+
+
+def test_policy_name_alone_is_enough(monkeypatch):
+    apply(monkeypatch, UNIFI_POLICY_ID=None, UNIFI_POLICY_NAME="Block Kids from Internet")
+    s = load_settings()
+    assert s.policy_id is None
+    assert s.policy_name == "Block Kids from Internet"
+    assert s.policy_descriptor == 'policy named "Block Kids from Internet"'
+
+
+def test_policy_id_alone_is_enough(monkeypatch):
+    apply(monkeypatch)
+    s = load_settings()
+    assert s.policy_name is None
+    assert s.policy_descriptor.startswith("policy 665f")
+
+
+def test_setting_both_warns_that_the_name_is_ignored(monkeypatch):
+    apply(monkeypatch, UNIFI_POLICY_NAME="Some Other Rule")
+    s = load_settings()
+    assert any("name is ignored" in w for w in s.warnings)
 
 
 def test_no_credentials_at_all_is_rejected(monkeypatch):

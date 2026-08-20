@@ -35,6 +35,7 @@ def make_settings(**overrides) -> Settings:
         "unifi_verify": False,
         "unifi_timeout": 5.0,
         "policy_id": POLICY_ID,
+        "policy_name": None,
         "policy_kind": "auto",
         "warnings": (),
     }

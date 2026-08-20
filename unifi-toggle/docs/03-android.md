@@ -58,12 +58,12 @@ In the **Project** panel on the left, make sure the dropdown at its top says
 Change exactly two lines:
 
 ```kotlin
-const val BASE_URL: String = "https://192.168.1.50:8080"
+const val BASE_URL: String = "https://192.168.0.50:8080"
 const val API_TOKEN: String = "paste-the-API_TOKEN-value-here"
 ```
 
 * `BASE_URL` must use the same address you passed to `make-cert.sh`. If you ran
-  `make-cert.sh 192.168.1.50` then it has to be `https://192.168.1.50:8080`.
+  `make-cert.sh 192.168.0.50` then it has to be `https://192.168.0.50:8080`.
   A different name that reaches the same VM will fail the certificate check.
 * `API_TOKEN` is the value of `API_TOKEN` from
   `/etc/unifi-toggle/unifi-toggle.env`, character for character.
@@ -160,9 +160,9 @@ should change from `Tap to refresh` to `ON as of 14:32` or `OFF as of 14:32`.
 ## Using it
 
 * **Enable** turns the policy on. **Disable** turns it off.
-* A toast confirms each tap, for example `Block Kids Internet is now enabled`.
+* A toast confirms each tap, for example `Block Kids from Internet is now enabled`.
 * Tap the status line to re-read the state without changing anything.
-* Tapping Enable when it is already on says `Block Kids Internet was already
+* Tapping Enable when it is already on says `Block Kids from Internet was already
   enabled` and changes nothing.
 * The status line refreshes on its own every 30 minutes.
 
@@ -177,8 +177,8 @@ The toast tells you which layer failed.
 | `Timed out. Is the VM awake and on the same network?` | The address answers slowly or not at all | Same checks as above |
 | `Rejected: no bearer token was sent` | `API_TOKEN` in `Config.kt` is empty | Fill it in, rebuild |
 | `Rejected: API_TOKEN in Config.kt does not match the VM` | Token mismatch | Copy it again from the env file, rebuild |
-| `Policy not found ...` | Wrong `UNIFI_POLICY_ID` on the VM | Re-run `probe-unifi.sh`, fix the env file, restart the service |
-| `The VM could not reach the UniFi console ...` | The VM to UDM Pro leg is broken | Check `journalctl -u unifi-toggle -f` |
+| `Policy not found ...` | Wrong `UNIFI_POLICY_ID` or `UNIFI_POLICY_NAME` on the VM, or the policy was renamed | Re-run `probe-unifi.sh`, fix the env file, restart the service |
+| `The VM could not reach the UniFi console ...` | The VM to UCG Ultra leg is broken | Check `journalctl -u unifi-toggle -f` |
 
 The last two are the VM's problem, not the phone's. The widget is showing you
 the middleware's own error and hint.

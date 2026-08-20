@@ -71,6 +71,18 @@ class ConnectivityError(FatalUniFiError):
     """The console could not be reached at all."""
 
 
+class AmbiguousPolicy(FatalUniFiError):
+    """A configured policy name matched more than one policy.
+
+    Fatal rather than "keep probing", because guessing which of two rules the
+    operator meant is exactly the wrong thing to do when the rule controls
+    network access.
+    """
+
+    def __init__(self, message: str, hint: str | None = None):
+        super().__init__(message, status=409, hint=hint)
+
+
 @dataclass(frozen=True)
 class PolicyState:
     policy_id: str
@@ -283,22 +295,40 @@ class UniFiClient:
 
     # ------------------------------------------------------------ discovery
 
+    def _matches(self, item: dict) -> bool:
+        """Match on ID when one is configured, otherwise on the display name."""
+        if self._s.policy_id:
+            return (
+                item.get("_id") == self._s.policy_id or item.get("id") == self._s.policy_id
+            )
+        wanted = (self._s.policy_name or "").strip().casefold()
+        # Firewall policies use "name". Legacy traffic rules use "description".
+        actual = str(item.get("name") or item.get("description") or "").strip().casefold()
+        return bool(wanted) and actual == wanted
+
     async def _find(self, kind: str) -> dict | None:
-        for item in await self._fetch_list(kind):
-            if item.get("_id") == self._s.policy_id or item.get("id") == self._s.policy_id:
-                return item
-        return None
+        matches = [item for item in await self._fetch_list(kind) if self._matches(item)]
+        if len(matches) > 1:
+            ids = ", ".join(str(m.get("_id") or m.get("id")) for m in matches)
+            raise AmbiguousPolicy(
+                f'{len(matches)} policies are named "{self._s.policy_name}" ({ids})',
+                hint=(
+                    "rename one of them in the UniFi UI, or set UNIFI_POLICY_ID to "
+                    "the one you want and clear UNIFI_POLICY_NAME."
+                ),
+            )
+        return matches[0] if matches else None
 
     async def _locate(self) -> tuple[str, dict]:
-        """Return (kind, policy object) for the configured policy ID."""
+        """Return (kind, policy object) for the configured policy ID or name."""
         if self._resolved_kind:
             found = await self._find(self._resolved_kind)
             if found is None:
                 raise PolicyNotFound(
-                    f"policy {self._s.policy_id} not found as a {self._resolved_kind}",
+                    f"{self._s.policy_descriptor} not found as a {self._resolved_kind}",
                     hint=(
-                        "confirm UNIFI_POLICY_ID and UNIFI_SITE. Run "
-                        "scripts/probe-unifi.sh to list every policy ID on the console."
+                        "confirm UNIFI_POLICY_ID or UNIFI_POLICY_NAME, and UNIFI_SITE. "
+                        "Run scripts/probe-unifi.sh to list every policy on the console."
                     ),
                 )
             return self._resolved_kind, found
@@ -316,13 +346,20 @@ class UniFiClient:
                 continue
             if found is not None:
                 self._resolved_kind = kind
-                log.info("resolved policy %s as kind %s", self._s.policy_id, kind)
+                log.info(
+                    "resolved %s as kind %s, id %s",
+                    self._s.policy_descriptor,
+                    kind,
+                    found.get("_id") or found.get("id"),
+                )
                 return kind, found
-        detail = "; ".join(errors) if errors else "the ID matched no policy of any kind"
+        detail = "; ".join(errors) if errors else "it matched no policy of any kind"
         raise PolicyNotFound(
-            f"policy {self._s.policy_id} not found on site {self._s.unifi_site} ({detail})",
+            f"{self._s.policy_descriptor} not found on site "
+            f"{self._s.unifi_site} ({detail})",
             hint=(
-                "run scripts/probe-unifi.sh to list the IDs the console actually has, "
+                "run scripts/probe-unifi.sh to list what the console actually has. "
+                "A name has to match exactly apart from case and surrounding spaces, "
                 "and check UNIFI_SITE if you use more than one site."
             ),
         )

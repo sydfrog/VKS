@@ -58,7 +58,7 @@ def _env_choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
 
 
 def _normalise_base_url(raw: str) -> str:
-    """Accept '192.168.1.1', 'https://192.168.1.1' or 'https://host:8443'."""
+    """Accept '192.168.0.1', 'https://192.168.0.1' or 'https://host:8443'."""
     candidate = raw.strip().rstrip("/")
     if "://" not in candidate:
         candidate = f"https://{candidate}"
@@ -88,11 +88,19 @@ class Settings:
     unifi_verify: bool | str
     unifi_timeout: float
 
-    policy_id: str
+    policy_id: str | None
+    policy_name: str | None
     policy_kind: str
 
     # Populated by resolve_auth_mode() so /status can report what is in use.
     warnings: tuple[str, ...] = field(default=())
+
+    @property
+    def policy_descriptor(self) -> str:
+        """How to refer to the target policy in a log line or an error."""
+        if self.policy_id:
+            return f"policy {self.policy_id}"
+        return f'policy named "{self.policy_name}"'
 
     @property
     def network_prefix(self) -> str:
@@ -114,7 +122,7 @@ def _resolve_verify() -> bool | str:
     """UNIFI_VERIFY_SSL is either a boolean or a path to a CA bundle."""
     raw = _env("UNIFI_VERIFY_SSL")
     if raw is None:
-        # A UDM Pro ships a self-signed certificate, so verification is off by
+        # A UCG Ultra ships a self-signed certificate, so verification is off by
         # default. Point this at a CA bundle once you trust the console cert.
         return False
     lowered = raw.lower()
@@ -162,6 +170,21 @@ def load_settings() -> Settings:
             "enabled this will fail with an MFA challenge. Prefer UNIFI_API_KEY."
         )
 
+    # The policy can be named by ID or by the name shown in the UniFi UI.
+    # The ID is stable across renames, so it wins when both are set.
+    policy_id = _env("UNIFI_POLICY_ID")
+    policy_name = _env("UNIFI_POLICY_NAME")
+    if not policy_id and not policy_name:
+        raise ConfigError(
+            "set UNIFI_POLICY_ID, or UNIFI_POLICY_NAME to match the name shown "
+            "in the UniFi UI. Run scripts/probe-unifi.sh to see both."
+        )
+    if policy_id and policy_name:
+        warnings.append(
+            "both UNIFI_POLICY_ID and UNIFI_POLICY_NAME are set. The ID is used "
+            "and the name is ignored."
+        )
+
     return Settings(
         api_token=api_token,
         bind_host=_env("BIND_HOST", "0.0.0.0") or "0.0.0.0",
@@ -180,7 +203,8 @@ def load_settings() -> Settings:
         unifi_password=password,
         unifi_verify=_resolve_verify(),
         unifi_timeout=float(_env_int("UNIFI_TIMEOUT", 10)),
-        policy_id=_env_required("UNIFI_POLICY_ID"),
+        policy_id=policy_id,
+        policy_name=policy_name,
         policy_kind=_env_choice("UNIFI_POLICY_KIND", "auto", VALID_POLICY_KINDS),
         warnings=tuple(warnings),
     )

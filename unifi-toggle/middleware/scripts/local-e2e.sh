@@ -63,7 +63,8 @@ UNIFI_API_KEY=fake-api-key-0123456789
 UNIFI_AUTH_MODE=apikey
 UNIFI_VERIFY_SSL=false
 UNIFI_TIMEOUT=10
-UNIFI_POLICY_ID=665f1c2a9b1e4a0001abcdef
+# Selected by name, the same way the shipped env file does it.
+UNIFI_POLICY_NAME="Block Kids from Internet"
 UNIFI_POLICY_KIND=auto
 ENVEOF
 

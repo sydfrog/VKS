@@ -3,7 +3,7 @@
 # Generate a private CA and a server certificate for the middleware.
 #
 # Usage: scripts/make-cert.sh <vm-ip-or-hostname> [output-dir]
-#   scripts/make-cert.sh 192.168.1.50
+#   scripts/make-cert.sh 192.168.0.50
 #   scripts/make-cert.sh unifi-toggle.lan /etc/unifi-toggle/tls
 #
 # Why a CA and not just one self signed certificate: Android's network security

@@ -7,7 +7,7 @@
 #   scripts/smoke-test.sh                       uses /etc/unifi-toggle/unifi-toggle.env
 #   scripts/smoke-test.sh path/to/env           uses that env file
 #
-# Set BASE_URL to override the address, for example https://192.168.1.50:8080
+# Set BASE_URL to override the address, for example https://192.168.0.50:8080
 set -euo pipefail
 
 ENV_FILE="${1:-/etc/unifi-toggle/unifi-toggle.env}"

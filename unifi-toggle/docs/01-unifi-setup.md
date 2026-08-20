@@ -1,9 +1,13 @@
 # Part 1a: get an API key and the policy ID
 
-You need two values from the UDM Pro before anything else works:
+You need one value from the UCG Ultra before anything else works:
 
 * `UNIFI_API_KEY`, so the service can talk to the console
-* `UNIFI_POLICY_ID`, the one policy the widget will toggle
+
+You also need to name the policy the widget toggles. You already know its name,
+`Block Kids from Internet`, and the service accepts that directly, so the policy
+ID is optional. Getting it anyway is worth the one command, because an ID keeps
+working if you ever rename the policy.
 
 ## Why an API key and not your username and password
 
@@ -25,8 +29,8 @@ API key.
 ## Create the API key
 
 1. On a computer on the same network, open `https://<udm-ip>` in a browser,
-   for example `https://192.168.1.1`. Use the local address, not `unifi.ui.com`.
-   The browser will warn about the certificate because the UDM Pro signs its own.
+   for example `https://192.168.0.1`. Use the local address, not `unifi.ui.com`.
+   The browser will warn about the certificate because the UCG Ultra signs its own.
    Continue past the warning.
 2. Sign in. This is the point where you answer your 2FA prompt, by hand, once.
 3. Open **Settings**, the gear icon.
@@ -45,39 +49,44 @@ VM and nowhere else.
 
 ## Find the policy ID
 
-The reliable way is to ask the console. On the VM, after you have cloned this
+You can skip this and set `UNIFI_POLICY_NAME="Block Kids from Internet"` in the
+env file instead. Do that if you want to get running quickly. The trade off is
+that renaming the policy in the UniFi UI later breaks the widget, whereas an ID
+survives a rename.
+
+To get the ID, ask the console. On the VM, after you have cloned this
 repository:
 
 ```bash
 cd unifi-toggle/middleware
-UNIFI_HOST=192.168.1.1 UNIFI_API_KEY=<the-key-you-just-copied> scripts/probe-unifi.sh
+UNIFI_HOST=192.168.0.1 UNIFI_API_KEY=<the-key-you-just-copied> scripts/probe-unifi.sh
 ```
 
-Replace `192.168.1.1` with your UDM Pro address and paste your real key.
+Replace `192.168.0.1` with your UCG Ultra address and paste your real key.
 
 It prints something like this:
 
 ```
-Console: https://192.168.1.1   site: default
+Console: https://192.168.0.1   site: default
 
 === Firewall policies (Network 9.x zone based)
-    https://192.168.1.1/proxy/network/v2/api/site/default/firewall-policies
-    665f1c2a9b1e4a0001abcdef  disabled  Block Kids Internet
+    https://192.168.0.1/proxy/network/v2/api/site/default/firewall-policies
+    665f1c2a9b1e4a0001abcdef  disabled  Block Kids from Internet
     665f1c2a9b1e4a0001ffffff  enabled   Allow Return Traffic  [predefined, cannot be toggled]
 
 === Traffic rules
-    https://192.168.1.1/proxy/network/v2/api/site/default/trafficrules
+    https://192.168.0.1/proxy/network/v2/api/site/default/trafficrules
     none found
 
 === Legacy firewall rules
-    https://192.168.1.1/proxy/network/api/s/default/rest/firewallrule
+    https://192.168.0.1/proxy/network/api/s/default/rest/firewallrule
     none found
 
 Copy the ID of the policy you want into UNIFI_POLICY_ID.
 ```
 
-Find the line whose name matches the policy you created in the UI, and copy the
-long hex ID from the start of that line. That is `UNIFI_POLICY_ID`.
+Find the line reading `Block Kids from Internet` and copy the long hex ID from
+the start of it. That is `UNIFI_POLICY_ID`.
 
 Two things to watch for:
 
@@ -118,7 +127,7 @@ three shapes works without a config change.
 | Value | Ends up in | Ever on the phone? |
 | --- | --- | --- |
 | UniFi API key | `/etc/unifi-toggle/unifi-toggle.env` on the VM | No |
-| Policy ID | `/etc/unifi-toggle/unifi-toggle.env` on the VM | No |
+| Policy name or ID | `/etc/unifi-toggle/unifi-toggle.env` on the VM | No |
 | Bearer token | The env file, and `Config.kt` in the app | Yes |
 | CA certificate | The VM, and `res/raw/unifi_toggle_ca.pem` | Yes, public part only |
 
