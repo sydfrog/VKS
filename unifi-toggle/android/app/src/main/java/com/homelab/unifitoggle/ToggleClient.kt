@@ -19,10 +19,16 @@ data class ToggleResult(
     val policyName: String?,
     val message: String,
 ) {
-    /** Short line for the widget. Keeps the last known state visible. */
+    /** Short line for the widget. Keeps the last known state visible.
+     *
+     * On failure the reason goes here, not only in the toast. Android suppresses
+     * background toasts on some versions, and the widget updates from a broadcast
+     * receiver, so the toast is exactly the case Android may drop. The status
+     * line is the one place the reason is guaranteed to be seen.
+     */
     fun statusLine(): String {
         val stamp = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        if (!ok) return "Failed at $stamp"
+        if (!ok) return "$stamp  $message"
         return when (enabled) {
             true -> "ON as of $stamp"
             false -> "OFF as of $stamp"
