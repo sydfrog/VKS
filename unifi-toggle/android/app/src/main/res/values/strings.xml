@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Kids Internet Access</string>
-    <string name="widget_title">Kids Internet Access</string>
+    <string name="app_name">UniFi Access Control</string>
+    <string name="widget_title">UniFi Access Control</string>
 
     <!-- Two button widget -->
     <string name="widget_buttons_description">Two buttons, Allow and Block, for Kids Internet Access.</string>
