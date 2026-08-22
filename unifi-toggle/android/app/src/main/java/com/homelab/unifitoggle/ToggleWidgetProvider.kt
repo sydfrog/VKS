@@ -110,6 +110,9 @@ class ToggleWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(
                     R.id.status_text, pendingIntent(context, ACTION_REFRESH, 3)
                 )
+                setOnClickPendingIntent(
+                    R.id.button_refresh, pendingIntent(context, ACTION_REFRESH, 4)
+                )
             }
 
         /** Repaint every placed instance of the widget. */

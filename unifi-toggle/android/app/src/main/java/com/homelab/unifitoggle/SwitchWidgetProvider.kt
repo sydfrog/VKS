@@ -121,6 +121,9 @@ class SwitchWidgetProvider : AppWidgetProvider() {
                 setOnClickPendingIntent(
                     R.id.switch_title, pendingIntent(context, ACTION_REFRESH, 2)
                 )
+                setOnClickPendingIntent(
+                    R.id.switch_refresh_button, pendingIntent(context, ACTION_REFRESH, 3)
+                )
             }
 
         fun render(context: Context, r: Render, unknownText: String?) {

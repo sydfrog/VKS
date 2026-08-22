@@ -5,7 +5,8 @@
 
     <!-- Two button widget -->
     <string name="widget_buttons_description">Two buttons, Allow and Block, for Kids Internet Access.</string>
-    <string name="status_idle">Tap to refresh</string>
+    <string name="status_idle">Tap refresh to check</string>
+    <string name="refresh">Refresh</string>
     <string name="button_allow">Allow</string>
     <string name="button_block">Block</string>
 
