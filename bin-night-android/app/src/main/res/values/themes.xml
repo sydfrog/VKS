@@ -1,0 +1,8 @@
+<resources>
+    <!-- Base theme; Compose drives the real colours. This just gives the
+         splash/window a sensible background before Compose draws. -->
+    <style name="Theme.BinNight" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#1B5E20</item>
+        <item name="android:windowBackground">#FFFBFE</item>
+    </style>
+</resources>
