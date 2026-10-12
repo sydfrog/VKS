@@ -1,0 +1,376 @@
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+const express = require('express');
+const multer = require('multer');
+const { APP_VERSION, DEPOT_DIR, DOWNLOAD_LOGS_DIR, TOKEN_DIR, PORT, LISTEN_HOST, CLI_JAVA_TOOL_OPTIONS } = require('./lib/config');
+const appSettings = require('./lib/appSettings');
+const lifecycle = require('./lib/lifecycle');
+const tokenStore = require('./lib/tokenStore');
+const depotId = require('./lib/depotId');
+const scheduleStore = require('./lib/scheduleStore');
+const { getReleases } = require('./lib/releaseCache');
+const { listBinaries, deleteBinaries } = require('./lib/binaries');
+const depotIndex = require('./lib/depotIndex');
+const artifactsIndex = require('./lib/artifactsIndex');
+const { startDownload, getLiveJob } = require('./lib/downloadJobs');
+const jobStore = require('./lib/jobStore');
+const cliLogs = require('./lib/cliLogs');
+const { getCliVersion, cliAtLeast } = require('./lib/cliVersion');
+const {
+  listArtifacts,
+  ARTIFACT_CATEGORIES,
+  ARTIFACT_COMPONENTS,
+  CATEGORY_KEYS,
+  COMPONENT_KEYS,
+} = require('./lib/artifacts');
+const { getDepotStorage } = require('./lib/diskUsage');
+const { getStats } = require('./lib/systemStats');
+const cliInstall = require('./lib/cliInstall');
+const { CliError } = require('./lib/cliRunner');
+
+const router = express.Router();
+
+function handleError(res, err) {
+  const status = err instanceof CliError ? 502 : 400;
+  res.status(status).json({ error: err.message });
+}
+
+// Disk storage, not memory - the archive can be several hundred MB. Written
+// to a scratch dir and removed by cliInstall.installFromUpload() once
+// extraction is done (success or failure).
+const cliUpload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 },
+});
+
+// Instant and CLI-independent on purpose - this must never block on
+// spawning/waiting for the CLI, which can be slow or, if something's wrong
+// with the mount, hang for a long time. The CLI's own version is fetched
+// separately (see /cli-version) so a slow/broken CLI can't freeze this.
+router.get('/version', (req, res) => {
+  res.json({ app: 'vcf-download-tool-gui', version: APP_VERSION, depotDir: DEPOT_DIR, platform: process.platform });
+});
+
+// Settings that replace the container's environment variables / volumes.
+// `active` is what this process is running with; `saved` is what's on disk
+// and takes effect after a restart.
+router.get('/app-settings', (req, res) => {
+  res.json({
+    saved: appSettings.load(),
+    active: {
+      depotDir: DEPOT_DIR,
+      port: PORT,
+      listenHost: LISTEN_HOST,
+      openMode: appSettings.active.openMode,
+      javaToolOptions: CLI_JAVA_TOOL_OPTIONS,
+    },
+    dataDir: TOKEN_DIR,
+    settingsFile: appSettings.SETTINGS_FILE,
+    envOverrides: ['DEPOT_DIR', 'PORT', 'LISTEN_HOST', 'CLI_JAVA_TOOL_OPTIONS'].filter((k) => process.env[k]),
+  });
+});
+
+router.post('/app-settings', (req, res) => {
+  try {
+    res.json({ saved: appSettings.save(req.body || {}) });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// Relaunches the app so saved settings take effect. Refused while a
+// download is running unless the caller explicitly accepts stopping it.
+router.post('/app/restart', (req, res) => {
+  const running = jobStore.listJobs().some((j) => j.status === 'running');
+  if (running && !(req.body && req.body.force)) {
+    res.status(409).json({ error: 'A download is running - restarting would stop it.', running: true });
+    return;
+  }
+  res.json({ ok: true });
+  setTimeout(() => lifecycle.relaunch(), 200);
+});
+
+// `artifacts` (OCI-based content: VKR, Supervisor, VKS, ...) landed in CLI
+// 9.1.1.0. Below that the front-end keeps the classic Install/Upgrade/Both
+// Type dropdown; at or above it, "Both" is dropped and the artifact
+// categories/components are offered as extra Type options.
+const ARTIFACTS_MIN_CLI = '9.1.1';
+
+router.get('/cli-version', async (req, res) => {
+  const cliVersion = await getCliVersion();
+  const artifactsSupported = await cliAtLeast(ARTIFACTS_MIN_CLI);
+  res.json({
+    cliVersion,
+    artifactsSupported,
+    artifactCategories: artifactsSupported ? ARTIFACT_CATEGORIES : [],
+    artifactComponents: artifactsSupported ? ARTIFACT_COMPONENTS : [],
+  });
+});
+
+router.get('/storage', async (req, res) => {
+  const storage = await getDepotStorage();
+  res.json(storage || { totalBytes: 0, usedBytes: 0, freeBytes: 0, usedPercent: 0, unavailable: true });
+});
+
+router.get('/system-stats', async (req, res) => {
+  res.json(await getStats());
+});
+
+router.get('/cli/status', (req, res) => {
+  res.json(cliInstall.getInstallStatus());
+});
+
+router.post('/cli/install', cliUpload.single('archive'), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+  try {
+    await cliInstall.installFromUpload(req.file.path);
+    res.json(cliInstall.getInstallStatus());
+  } catch (err) {
+    const status = err instanceof cliInstall.CliInstallError ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+router.get('/cli-logs', async (req, res) => {
+  try {
+    res.json(await cliLogs.listLogs());
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list CLI log directory.' });
+  }
+});
+
+router.get('/cli-logs/*', async (req, res) => {
+  const relativePath = req.params[0] || '';
+  try {
+    res.json(await cliLogs.readLogEntry(relativePath, { full: req.query.full === 'true' }));
+  } catch (err) {
+    if (err instanceof cliLogs.CliLogPathError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err.code === 'ENOENT') {
+      res.status(404).json({ error: 'Log file not found.' });
+      return;
+    }
+    if (err instanceof cliLogs.CliLogReadError) {
+      res.status(502).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to read log file.' });
+  }
+});
+
+router.get('/token', (req, res) => {
+  res.json(tokenStore.getStatus());
+});
+
+router.post('/token', (req, res) => {
+  try {
+    tokenStore.save(req.body && req.body.token);
+    res.json(tokenStore.getStatus());
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.delete('/token', (req, res) => {
+  tokenStore.clear();
+  res.json(tokenStore.getStatus());
+});
+
+router.get('/depot-id', (req, res) => {
+  res.json(depotId.getStatus());
+});
+
+router.post('/depot-id/generate', async (req, res) => {
+  try {
+    res.json(await depotId.generate());
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.post('/depot-id', (req, res) => {
+  try {
+    res.json(depotId.setExisting(req.body && req.body.id));
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/schedule', (req, res) => {
+  res.json({
+    ...scheduleStore.getSchedule(),
+    serverTime: new Date().toISOString(),
+    serverTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+});
+
+router.post('/schedule', (req, res) => {
+  try {
+    const { enabled, mode, time, days } = req.body || {};
+    res.json(scheduleStore.setSchedule({ enabled, mode, time, days }));
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/releases', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === 'true';
+    const data = await getReleases({ forceRefresh });
+    res.json(data);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/binaries', async (req, res) => {
+  try {
+    const { version, sku, type } = req.query;
+    const result = await listBinaries({ version, sku, type });
+    const index = await depotIndex.getIndex();
+    result.binaries = result.binaries.map((b) => ({
+      ...b,
+      downloaded: depotIndex.isDownloaded(index, b.component, b.version, b.type),
+    }));
+    res.json(result);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// CLI >= 9.1.1 only. Lists OCI-based workload-component artifacts for one
+// VCF version, narrowed to a single --category or --component. Same row
+// shape as /binaries so the front-end table renders it unchanged.
+router.get('/artifacts', async (req, res) => {
+  try {
+    if (!(await cliAtLeast(ARTIFACTS_MIN_CLI))) {
+      res.status(409).json({ error: 'The installed CLI is older than 9.1.1 - artifacts are not available.' });
+      return;
+    }
+    const { version, sku, category, component } = req.query;
+    const result = await listArtifacts({ version, sku, category, component });
+    const idx = await artifactsIndex.getIndex();
+    const binaries = result.artifacts.map((a) => {
+      const st = artifactsIndex.artifactState(idx, a.component, a.version);
+      return { ...a, downloaded: st === 'downloaded', partial: st === 'partial' };
+    });
+    res.json({ binaries, queriedVersion: result.queriedVersion });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.post('/delete', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const binaries = body.binaries || [];
+    if (body.mode === 'artifacts') {
+      const result = await artifactsIndex.deleteArtifacts(
+        binaries.map((b) => ({ component: b.component, version: b.version }))
+      );
+      artifactsIndex.invalidate();
+      res.json({ ok: true, ...result });
+      return;
+    }
+    const result = await deleteBinaries(binaries);
+    depotIndex.invalidate();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/downloads', (req, res) => {
+  res.json({ jobs: jobStore.listJobs() });
+});
+
+router.post('/download', (req, res) => {
+  try {
+    const body = req.body || {};
+    const ids = body.ids;
+    const binaries = body.binaries || [];
+
+    const opts = {};
+    if (body.mode === 'artifacts') {
+      const category = body.category || null;
+      const component = body.component || null;
+      if (category && !CATEGORY_KEYS.has(category)) throw new Error(`Unknown artifact category: ${category}`);
+      if (component && !COMPONENT_KEYS.has(component)) throw new Error(`Unknown artifact component: ${component}`);
+      if (!category && !component) throw new Error('An artifact category or component is required');
+      if (!body.vcfVersion) throw new Error('A VCF version is required for artifact downloads');
+      opts.mode = 'artifacts';
+      opts.sku = body.sku || 'VCF';
+      opts.vcfVersion = body.vcfVersion;
+      opts.filter = category ? { category } : { component };
+    }
+
+    const jobId = startDownload(ids, binaries, opts);
+    res.json({ jobId });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/download/:jobId/stream', (req, res) => {
+  const jobId = req.params.jobId;
+  const jobRecord = jobStore.getJob(jobId);
+  const live = getLiveJob(jobId);
+
+  if (!jobRecord && !live) {
+    res.status(404).json({ error: 'Unknown or expired download job' });
+    return;
+  }
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  let historicalLines = [];
+  if (live) {
+    historicalLines = live.lines;
+  } else {
+    try {
+      historicalLines = fs
+        .readFileSync(path.join(DOWNLOAD_LOGS_DIR, `${jobId}.log`), 'utf8')
+        .split('\n')
+        .filter(Boolean);
+    } catch (err) {
+      historicalLines = []; // no persisted log for this job (predates this feature, or was pruned)
+    }
+  }
+  for (const line of historicalLines) {
+    res.write(`data: ${line}\n\n`);
+  }
+
+  const isRunning = jobRecord ? jobRecord.status === 'running' : false;
+  if (!isRunning || !live) {
+    res.write(`event: done\ndata: ${jobRecord ? jobRecord.exitCode : ''}\n\n`);
+    res.end();
+    return;
+  }
+
+  const onLine = (line) => res.write(`data: ${line}\n\n`);
+  const onDone = () => {
+    const finalRecord = jobStore.getJob(jobId);
+    res.write(`event: done\ndata: ${finalRecord ? finalRecord.exitCode : ''}\n\n`);
+    res.end();
+  };
+  live.emitter.on('line', onLine);
+  live.emitter.on('done', onDone);
+
+  req.on('close', () => {
+    live.emitter.off('line', onLine);
+    live.emitter.off('done', onDone);
+  });
+});
+
+module.exports = router;

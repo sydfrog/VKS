@@ -1,0 +1,47 @@
+name: VCF Download Tool GUI (Windows)
+
+on:
+  push:
+    paths:
+      - 'vcf-download-tool-gui-windows/**'
+      - '.github/workflows/vcf-download-tool-gui-windows.yml'
+  pull_request:
+    paths:
+      - 'vcf-download-tool-gui-windows/**'
+      - '.github/workflows/vcf-download-tool-gui-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: vcf-download-tool-gui-windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vcf-download-tool-gui-windows/package-lock.json
+
+      - run: npm ci
+
+      - name: Smoke test (node server/index.js)
+        run: node test/smoke.js
+
+      - name: Build single-file exe
+        run: npm run build
+
+      - name: Smoke test (packaged exe)
+        run: node test/smoke.js --exe=dist\VCF-Download-Tool-GUI.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VCF-Download-Tool-GUI-windows-x64
+          path: vcf-download-tool-gui-windows/dist/VCF-Download-Tool-GUI.exe
+          if-no-files-found: error

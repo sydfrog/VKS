@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec "$FAKE_CLI_NODE" "$(dirname "$0")/fake-cli.js" "$@"
